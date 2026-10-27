@@ -192,6 +192,8 @@ textarea:focus{outline:none;border-color:var(--heart)}
 .err{color:var(--crit);font-size:16px;min-height:1.4em;margin:0}
 .save{border:0;border-radius:24px;background:var(--heart);color:var(--heart-ink);font-family:var(--f-display);font-size:28px;letter-spacing:.2em;padding:18px}
 
+.wx-tip{position:sticky;top:env(safe-area-inset-top,0px);z-index:25;background:var(--crit);color:#fff;padding-block:12px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:2px;font-size:15px}
+.wx-tip b{font-size:18px}
 .backup{background:var(--elev-soft);border-radius:22px;padding:14px 16px;display:flex;flex-direction:column;gap:10px}
 .backup-txt{display:flex;flex-direction:column;gap:2px;min-width:0}
 .backup-txt b{font-family:var(--f-display);font-weight:400;font-size:21px;color:var(--elev)}
@@ -249,7 +251,11 @@ textarea:focus{outline:none;border-color:var(--heart)}
 
 </head>
 <body>
-<noscript><div class="nojs"><b>这里打不开小周血压本</b>手机自带的文件预览不能运行 App，记录和按钮都用不了。请用 Chrome 或 Safari 浏览器打开小周血压本的网址。</div></noscript>
+<noscript><div class="nojs"><b>这里打不开小周血压本</b>手机自带的文件预览不能运行 App，记录和按钮都用不了。请用手机自带的浏览器（或 Chrome）打开小周血压本的网址。</div></noscript>
+<div class="wx-tip" id="wx-tip" hidden>
+  <b>请在浏览器里打开小周血压本</b>
+  <span>现在是在微信里打开的，微信里记的血压可能会被清掉。请点右上角「···」，选「在浏览器打开」，再在浏览器里把它添加到桌面。</span>
+</div>
 <div class="app">
   <div class="top">
     <h1 class="brand">小周<span>血压本</span></h1>
@@ -326,7 +332,7 @@ textarea:focus{outline:none;border-color:var(--heart)}
     <div class="stats" id="stats"></div>
     <div class="share">
       <h3 class="section-title" style="font-size:19px;margin:0">给医生看</h3>
-      <p>复诊时可以导出 Excel 表格给医生看：偏高、很高的记录标红，偏低的标蓝。也可以复制成文字发到 WhatsApp 或家庭群。</p>
+      <p>复诊时可以导出 Excel 表格给医生看：偏高、很高的记录标红，偏低的标蓝。也可以复制成文字发到微信或家庭群。</p>
       <div class="btns">
         <button class="btn primary" id="export-csv" hidden>导出全部记录</button>
         <button class="btn danger" id="export-bad" hidden>只导出异常记录</button>
@@ -1901,7 +1907,7 @@ var BPOCR = (function(){
     var fb=$("copy-fallback");
     function fallback(){ fb.hidden=false; fb.value=txt; fb.focus(); fb.select(); toast("长按上面的文字，选“全选”再复制"); }
     try{
-      navigator.clipboard.writeText(txt).then(function(){ fb.hidden=true; toast("已复制，可以粘贴到 WhatsApp 或微信里"); }, fallback);
+      navigator.clipboard.writeText(txt).then(function(){ fb.hidden=true; toast("已复制，可以粘贴到微信里"); }, fallback);
     }catch(e){ fallback(); }
   });
 
@@ -2023,7 +2029,7 @@ var BPOCR = (function(){
     if (!installEvt){
       $("install-sub").textContent = IS_IOS
         ? "点 Safari 下面的「分享」按钮，再选「添加到主屏幕」，桌面上就有心心的图标啦。"
-        : "点浏览器右上角「⋮」，选「安装应用」或「添加到主屏幕」。在 WhatsApp 里打开的话，先选「在 Chrome 中打开」。";
+        : "点浏览器的菜单（右上角「⋮」或下面的「≡」），选「安装应用」或「添加到桌面」。";
       $("install-btn").hidden=true;
     } else { $("install-btn").hidden=false; }
   }
@@ -2038,9 +2044,13 @@ var BPOCR = (function(){
   if (IS_APP_HOST){
     if ("serviceWorker" in navigator){ try{ navigator.serviceWorker.register("sw.js").catch(function(){}); }catch(e){} }
     if (navigator.storage && navigator.storage.persist){ try{ navigator.storage.persist().catch(function(){}); }catch(e){} }
-    // 安卓 Chrome 会发 beforeinstallprompt；等一会儿没等到（苹果手机、WhatsApp 内置浏览器）就显示手动步骤
+    // 安卓 Chrome 会发 beforeinstallprompt；等一会儿没等到（苹果手机、华为浏览器等）就显示手动步骤
     setTimeout(showInstall, IS_IOS ? 800 : 4000);
   }
+
+  // 在微信内置浏览器里：数据可能被清，提示换浏览器；装 App 的卡片也不显示
+  var IN_WECHAT = /MicroMessenger/i.test(navigator.userAgent);
+  if (IN_WECHAT && !HAS_CLAUDE){ $("wx-tip").hidden=false; IS_APP_HOST=false; }
 
   /* ---------- 启动 ---------- */
   renderAllViews(); defaultSay();
