@@ -9,6 +9,22 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="小周血压本">
 <link rel="manifest" href="manifest.webmanifest">
+<script>
+/* 浏览器模式：网址带 ?browser 时，不给浏览器“安装成 App”的说明，
+   这样“添加到桌面”出来的图标会直接用浏览器打开（华为 P40 等没有谷歌服务的手机，桌面 App 模式打不开相机）。
+   记在这台手机上，以后不带 ?browser 打开也保持；带 ?app 打开可以改回来。 */
+(function(){
+  try{
+    var q=location.search;
+    if (/[?&]browser\b/.test(q)) localStorage.setItem("xz-browser-mode","1");
+    if (/[?&]app\b/.test(q)) localStorage.removeItem("xz-browser-mode");
+    if (localStorage.getItem("xz-browser-mode")==="1"){
+      var l=document.querySelector('link[rel="manifest"]'); if (l) l.parentNode.removeChild(l);
+      document.documentElement.setAttribute("data-browser-mode","1");
+    }
+  }catch(e){}
+})();
+</script>
 <link rel="icon" type="image/png" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>小周血压本</title>
@@ -65,6 +81,7 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 .cam-guide span{transform:translateY(-130%);color:#fff;font-size:18px;font-weight:600;text-shadow:0 1px 4px rgba(0,0,0,.6);white-space:nowrap}
 .cam-msg{position:absolute;left:16px;right:16px;top:calc(16px + env(safe-area-inset-top,0px));margin:0;background:rgba(0,0,0,.78);color:#fff;border-radius:16px;padding:14px 16px;font-size:17px;z-index:3;display:flex;flex-direction:column;gap:12px}
 .cam-msg p{margin:0}
+.cam-retry{border:0;background:none;color:#fff;text-decoration:underline;font-size:15px;padding:4px 0;align-self:center}
 .cam-sys{display:block;background:var(--heart);color:#fff;border-radius:14px;padding:14px;font-size:19px;font-weight:700}
 .cam-alb{border:0;background:rgba(255,255,255,.18);color:#fff;font-size:18px;border-radius:14px;padding:12px 18px;min-width:84px}
 .cam-bar{position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:space-between;padding:18px max(24px,env(safe-area-inset-right,0px)) calc(24px + env(safe-area-inset-bottom,0px)) max(24px,env(safe-area-inset-left,0px));background:linear-gradient(transparent,rgba(0,0,0,.6))}
@@ -472,6 +489,7 @@ textarea:focus{outline:none;border-color:var(--heart)}
   <div class="cam-msg" id="cam-box" hidden>
     <p id="cam-msg"></p>
     <span class="cam-sys pick" id="cam-sys" hidden>用手机相机拍<input type="file" class="pick-in cam-file" accept="image/*" capture="environment" aria-label="用手机相机拍"></span>
+    <button type="button" class="cam-retry" id="cam-retry" hidden>再试一次小周血压本的相机</button>
   </div>
   <div class="cam-bar">
     <button type="button" class="cam-x" id="cam-x">取消</button>
@@ -1780,26 +1798,61 @@ var BPOCR = (function(){
   function useLiveCam(){ return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia) && window.isSecureContext!==false && lsGet("xz-livecam")!=="0"; }
   function applyCamMode(){ $("scan-btn").classList.toggle("live", useLiveCam()); }
   function camMsg(t, sys){ $("cam-msg").textContent=t; $("cam-box").hidden=!t; $("cam-sys").hidden=!sys; $("cam").classList.toggle("err", !!sys); }
-  function openCam(){
-    $("cam").hidden=false; document.body.style.overflow="hidden"; camMsg("正在打开相机…");
+  var camSession=0, camWatch=null;
+  var CAM_TIP="也可以先用手机自带的「相机」把血压计拍下来，再点右下角「相册」选这张照片。";
+  function camFail(why){
+    camSession++; stopStream(); clearInterval(camWatch);
+    lsSet("xz-livecam-bad","1");
+    camMsg(why+"点下面的按钮用手机相机拍；如果按钮也打不开相机，"+CAM_TIP.replace("也可以",""), true);
+    $("cam-retry").hidden=false;
+  }
+  function stopStream(){ if (camStream){ camStream.getTracks().forEach(function(t){ try{ t.stop(); }catch(e){} }); camStream=null; } try{ $("cam-v").srcObject=null; }catch(e){} }
+  function openCam(force){
+    var my=++camSession;
+    $("cam").hidden=false; document.body.style.overflow="hidden"; $("cam-retry").hidden=true;
     $("cam-shot").disabled=true;
-    navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"}, width:{ideal:1920}, height:{ideal:1440}}, audio:false})
-      .then(function(st){
+    // 这台手机之前卡住过：直接给手机相机 / 相册，不让妈咪再干等
+    if (!force && lsGet("xz-livecam-bad")==="1"){
+      camMsg("这台手机上小周血压本自己的相机不太好用。点下面的按钮用手机相机拍，或者点右下角「相册」选照片。"+CAM_TIP, true);
+      $("cam-retry").hidden=false; return;
+    }
+    camMsg("正在打开相机…");
+    var tries=[{video:{facingMode:{ideal:"environment"}, width:{ideal:1280}, height:{ideal:960}}, audio:false},
+               {video:{facingMode:"environment"}, audio:false},
+               {video:true, audio:false}];
+    var giveUp=setTimeout(function(){ if (my===camSession) camFail("相机打开得太慢了。"); }, 8000);
+    (function attempt(i){
+      navigator.mediaDevices.getUserMedia(tries[i]).then(function(st){
+        if (my!==camSession){ st.getTracks().forEach(function(t){ t.stop(); }); return; }
         camStream=st; var v=$("cam-v"); v.srcObject=st;
         var p=v.play(); if (p && p.catch) p.catch(function(){});
-        camMsg(""); $("cam-shot").disabled=false;
-      })
-      .catch(function(e){
+        // 等真的有画面再放开快门；画面一直不动就算卡住
+        var frames=0, lastT=-1, still=0, started=Date.now();
+        if (v.requestVideoFrameCallback){ (function tick(){ if (my!==camSession) return; frames++; v.requestVideoFrameCallback(tick); })(); }
+        clearInterval(camWatch);
+        camWatch=setInterval(function(){
+          if (my!==camSession){ clearInterval(camWatch); return; }
+          var moving = v.requestVideoFrameCallback ? frames>2 : (v.currentTime!==lastT && v.videoWidth>0);
+          if (v.requestVideoFrameCallback){ moving = frames>2; frames=0; }
+          lastT=v.currentTime;
+          if (moving){ still=0; if ($("cam-shot").disabled){ clearTimeout(giveUp); camMsg(""); $("cam-shot").disabled=false; lsSet("xz-livecam-bad","0"); } }
+          else { still++; if (still>=5) camFail($("cam-shot").disabled ? "相机打开了，但是没有画面。" : "相机画面卡住了。"); }
+        }, 800);
+      }).catch(function(e){
+        if (my!==camSession) return;
         var n=e && e.name;
-        if (n==="NotAllowedError"||n==="SecurityError") camMsg("小周血压本还没有相机权限。点下面的按钮用手机相机拍，或者点右下角「相册」选照片。", true);
-        else camMsg("这里打不开小周血压本自己的相机。点下面的按钮用手机相机拍，或者点右下角「相册」选照片。", true);
+        if (n==="NotAllowedError"||n==="SecurityError"){ clearTimeout(giveUp); camFail("小周血压本还没有相机权限。"); return; }
+        if (i+1<tries.length) return attempt(i+1);
+        clearTimeout(giveUp); camFail("这里打不开小周血压本自己的相机。");
       });
+    })(0);
   }
   function closeCam(){
-    if (camStream){ camStream.getTracks().forEach(function(t){ t.stop(); }); camStream=null; }
-    $("cam-v").srcObject=null; $("cam").hidden=true; document.body.style.overflow="";
+    camSession++; clearInterval(camWatch); stopStream();
+    $("cam").hidden=true; document.body.style.overflow="";
   }
   $("cam-x").addEventListener("click", closeCam);
+  $("cam-retry").addEventListener("click", function(){ lsSet("xz-livecam-bad","0"); camMsg(""); $("cam").classList.remove("err"); openCam(true); });
   document.querySelectorAll(".cam-file").forEach(function(inp){
     inp.addEventListener("click", function(){ this.value=""; });
     inp.addEventListener("change", function(){
@@ -1939,8 +1992,17 @@ var BPOCR = (function(){
   function fullDate(t){ var d=new Date(t); return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate()); }
   function csvCell(v){ v=String(v==null?"":v); return /[",\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; }
   // 存文件：手机上优先用系统「分享」（iPhone 桌面 App 里网页下载会被拦掉），不行再用下载
+  var IN_APK = !!(window.XiaozhouApp && window.XiaozhouApp.saveFile);
+  function toB64(u8){ var s="", CH=0x8000; for (var i=0;i<u8.length;i+=CH) s+=String.fromCharCode.apply(null, u8.subarray(i,i+CH)); return btoa(s); }
   function saveFile(fname, data, mime, opts){
     opts=opts||{};
+    if (IN_APK){
+      var u8 = typeof data==="string" ? new TextEncoder().encode(data) : (data instanceof Uint8Array ? data : new Uint8Array(data));
+      var r="fail"; try{ r=window.XiaozhouApp.saveFile(fname, toB64(u8), mime, true); }catch(e){}
+      if (r==="ok"){ toast("已存到手机的「下载 / 小周血压本」，也可以直接发到微信"); if (opts.onDone) opts.onDone(); }
+      else toast("没存成功，可以用「复制文字」");
+      return;
+    }
     if (dl){
       return dl.save({filename:fname, data:data})
         .then(function(){ toast("表格已保存"); if (opts.onDone) opts.onDone(); })
@@ -2166,7 +2228,7 @@ var BPOCR = (function(){
   var IS_IOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform==="MacIntel" && navigator.maxTouchPoints>1);
   function installDismissed(){ try{ var t=+localStorage.getItem("xz-install-x")||0; return Date.now()-t < 14*864e5; }catch(e){ return false; } }
   function showInstall(){
-    if (!IS_APP_HOST || isStandalone() || installDismissed()) return;
+    if (!IS_APP_HOST || isStandalone() || installDismissed() || window.XiaozhouApp) return;
     $("install-ico").src="icon-192.png";
     $("install-card").hidden=false;
     if (!installEvt){
@@ -2196,6 +2258,17 @@ var BPOCR = (function(){
   if (IN_WECHAT && !HAS_CLAUDE){ $("wx-tip").hidden=false; IS_APP_HOST=false; }
 
   applyCamMode();
+
+  // 安卓 App 的返回键：先关掉打开着的窗口，没有窗口再退出
+  window.__xzBack=function(){
+    if (!$("cam").hidden){ closeCam(); return true; }
+    if (!$("cele").hidden){ $("cele").hidden=true; return true; }
+    if (!$("imp-sheet").hidden){ if (!impBusy){ $("imp-sheet").hidden=true; document.body.style.overflow=""; } return true; }
+    if (!$("sheet").hidden){ closeForm(); return true; }
+    var v=["list","trend"].filter(function(n){ return !$("view-"+n).hidden; });
+    if (v.length){ showView("home"); return true; }
+    return false;
+  };
 
   /* ---------- 启动 ---------- */
   renderAllViews(); defaultSay();
