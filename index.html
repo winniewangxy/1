@@ -150,6 +150,9 @@ button{cursor:pointer}
 .scan-msg b{display:block;font-family:var(--f-display);font-weight:400;color:var(--heart);font-size:18px}
 .scan-box.busy .scan-msg span::after{content:"";display:inline-block;width:1.2em;text-align:left;animation:dots 1.2s steps(4) infinite}
 @keyframes dots{0%{content:""}25%{content:"."}50%{content:".."}75%{content:"..."}}
+.field.check{border-color:var(--elev)!important;background:var(--elev-soft)!important}
+.field.check::after{content:"请核对";flex:none;font-size:13px;font-weight:700;color:var(--elev);order:-1;position:absolute;margin-top:-58px;margin-left:-6px;background:var(--elev-soft);padding:0 6px;border-radius:6px}
+.field{position:relative}
 .field.filled{background:var(--heart-soft)} .field.dia.filled{background:var(--dia-soft)}
 
 .today-list{display:flex;flex-direction:column;gap:10px}
@@ -1127,13 +1130,15 @@ var BPOCR = (function(){
   }
 
   // 4. 七段判读
+  // 读一位数字：和 0~9 每个数字的“笔画样子”比，挑最像的；同时记下有多大把握
+  var DIGIT_CONF=[];
   function readDigit(M, d, rowH){
     var w=d.x1-d.x0+1, h=d.y1-d.y0+1;
-    if (w < h*0.36) return "1";
-    var R={a:[.25,.75,0,.17], b:[.68,1,.12,.45], c:[.68,1,.55,.88], d:[.25,.75,.83,1],
-           e:[0,.32,.55,.88], f:[0,.32,.12,.45], g:[.25,.75,.40,.60]};
-    // 斜体修正：上半部往右偏
-    var slant=0.06*h;
+    if (w < h*0.36){ DIGIT_CONF.push(1); return "1"; }
+    // 每根笔画只看它中间那段，避开笔画交界（以前中间那一横会碰到右边的竖，7 容易读成 9）
+    var R={a:[.30,.70,0,.16], b:[.70,1,.14,.42], c:[.70,1,.58,.86], d:[.30,.70,.84,1],
+           e:[0,.30,.58,.86], f:[0,.30,.14,.42], g:[.30,.70,.42,.58]};
+    var slant=0.06*h;                       // 斜体修正：上半部往右偏
     var fills={}, mx=0;
     "abcdefg".split("").forEach(function(k){
       var r=R[k], on=0, tot=0;
@@ -1141,24 +1146,27 @@ var BPOCR = (function(){
         var off=Math.round(slant*(0.5-y/h));
         for (var x=Math.floor(r[0]*w); x<Math.ceil(r[1]*w); x++){
           var xx=d.x0+x+off, yy=d.y0+y;
-          if (xx<0||xx>=M.w) continue;
+          if (xx<0||xx>=M.w||yy<0||yy>=M.h) continue;
           tot++; on+=M.m[yy*M.w+xx];
         }
       }
       fills[k]=tot?on/tot:0; if (fills[k]>mx) mx=fills[k];
     });
-    var thr=Math.max(0.12, mx*0.4), bits="";
-    "abcdefg".split("").forEach(function(k){ bits+= fills[k]>=thr ? "1":"0"; });
-    var best=null, bd=9;
+    if (mx<0.12){ DIGIT_CONF.push(0); return "?"; }
+    var n="abcdefg".split("").map(function(k){ var v=fills[k]/mx; return v>1?1:v; });
+    var best=null, bc=1e9, second=1e9;
     PATTERNS.forEach(function(p){
-      var dd=0; for (var i=0;i<7;i++) if (p[1][i]!==bits[i]) dd++;
-      if (dd<bd){ bd=dd; best=p[0]; }
+      var c=0; for (var i=0;i<7;i++){ var on=p[1][i]==="1"; c+= on ? (1-n[i])*(1-n[i]) : n[i]*n[i]; }
+      if (c<bc){ if (best!==p[0]) second=bc; bc=c; best=p[0]; }
+      else if (c<second && p[0]!==best) second=c;
     });
-    return bd<=1 ? best : "?";
+    if (bc>1.6){ DIGIT_CONF.push(0); return "?"; }
+    DIGIT_CONF.push(Math.max(0, Math.min(1, second-bc)));
+    return best;
   }
 
   function plausible(r){
-    return r.sys>=60 && r.sys<=260 && r.dia>=30 && r.dia<=160 && r.sys>r.dia+8 && (r.pulse==null || (r.pulse>=30 && r.pulse<=220));
+    return r.sys>=70 && r.sys<=250 && r.dia>=40 && r.dia<=150 && r.sys>r.dia+10 && r.sys<r.dia*3 && (r.pulse==null || (r.pulse>=35 && r.pulse<=200));
   }
   function readOnce(img, deg){
     var G=toGray(img, 900, deg);
@@ -1167,13 +1175,17 @@ var BPOCR = (function(){
     var M=segMask(G, box);
     var rows=splitDigits(M);
     if (!rows[0].digits.length || !rows[1].digits.length) return {ok:false, reason:"屏幕上的数字没看清"};
+    var confs=[];
     var nums=rows.map(function(r){
-      return r.digits.map(function(d){ return readDigit(M,d,r.h); }).join("");
+      DIGIT_CONF=[];
+      var t=r.digits.map(function(d){ return readDigit(M,d,r.h); }).join("");
+      confs.push(DIGIT_CONF.length ? Math.min.apply(null, DIGIT_CONF) : 0);
+      return t;
     });
     var sys=/^\d{2,3}$/.test(nums[0])?+nums[0]:null;
     var dia=/^\d{2,3}$/.test(nums[1]||"")?+nums[1]:null;
     var pulse=/^\d{2,3}$/.test(nums[2]||"")?+nums[2]:null;
-    var r={sys:sys, dia:dia, pulse:pulse, raw:nums, box:box, deg:deg, M:M, rows:rows};
+    var r={sys:sys, dia:dia, pulse:pulse, raw:nums, box:box, deg:deg, M:M, rows:rows, conf:confs};
     r.ok=!!(sys&&dia) && plausible(r);
     return r;
   }
@@ -1305,9 +1317,10 @@ var BPOCR = (function(){
     }).sort(function(a,b){ return a.y-b.y; }).slice(0,3);
     if (big.length<2) return {ok:false};
     var M={m:m, w:W, h:H};
-    var nums=big.map(function(rw){ return rw.d.map(function(d){ return readDigit(M,d,rw.h); }).join(""); });
+    var gconf=[];
+    var nums=big.map(function(rw){ DIGIT_CONF=[]; var t=rw.d.map(function(d){ return readDigit(M,d,rw.h); }).join(""); gconf.push(DIGIT_CONF.length?Math.min.apply(null,DIGIT_CONF):0); return t; });
     var sys=/^\d{2,3}$/.test(nums[0])?+nums[0]:null, dia=/^\d{2,3}$/.test(nums[1])?+nums[1]:null, pulse=/^\d{2,3}$/.test(nums[2]||"")?+nums[2]:null;
-    var res={sys:sys, dia:dia, pulse:pulse, raw:nums, deg:deg, inv:inv};
+    var res={sys:sys, dia:dia, pulse:pulse, raw:nums, deg:deg, inv:inv, conf:gconf};
     res.ok=!!(sys&&dia) && plausible(res);
     return res;
   }
@@ -1320,25 +1333,34 @@ var BPOCR = (function(){
   }
   // 拍歪了也能读：先试正的，再左右各转几度，挑第一个合理的结果（有脉搏的优先）
   function read(img){
-    var half=null, last=null, angles=[0,-4,4,-8,8,-12,12];
-    for (var i=0;i<angles.length;i++){
-      var r=readOnce(img, angles[i]); last=r;
-      if (r.ok && r.pulse!=null) return finish(r);
-      if (r.ok && !half) half=r;
+    // 从好几个角度各读一遍，结果投票：出现最多的那个血压赢；平票时看把握大小
+    function conf2(r){ var c=r.conf||[0,0]; return Math.min(c[0]||0, c[1]||0); }
+    var cands=[], last=null, angles=[0,-4,4,-8,8,-12,12];
+    angles.forEach(function(a){ var r=readOnce(img, a); last=r; if (r.ok) cands.push(r); });
+    if (cands.length<2){
+      [0,-4,4,-8,8].forEach(function(a){ [true,false].forEach(function(inv){ var g=readGeneric(img, a, inv); if (g.ok) cands.push(g); }); });
     }
-    if (half) return finish(half);
-    // 找不到白底屏幕：换成直接找数字的办法，黑底亮字、白底黑字都试
-    var gHalf=null, gAngles=[0,-4,4,-8,8];
-    for (var a=0;a<gAngles.length;a++) for (var k=0;k<2;k++){
-      var g=readGeneric(img, gAngles[a], k===0);
-      if (g.ok && g.pulse!=null) return finish(g);
-      if (g.ok && !gHalf) gHalf=g;
-    }
-    return finish(gHalf || {ok:false, reason:(last&&last.reason)||"屏幕上的数字没看清"});
+    if (!cands.length) return finish({ok:false, reason:(last&&last.reason)||"屏幕上的数字没看清"});
+    var votes={};
+    cands.forEach(function(r){ var k=r.sys+"/"+r.dia; votes[k]=(votes[k]||0)+1+conf2(r)*0.5-Math.abs(r.deg||0)*0.01; });
+    var keys=Object.keys(votes).sort(function(a,b){ return votes[b]-votes[a]; });
+    var win=keys[0], pool=cands.filter(function(r){ return r.sys+"/"+r.dia===win; });
+    // 心率也投票（有的角度认不出心率）
+    // 心率那一行字小，把握太低的就不算（宁可空着让妈咪自己填，也不填错）
+    var pv={}; pool.forEach(function(r){ var pc=r.conf&&r.conf[2]||0; if (r.pulse!=null && pc>=0.15 && (r.pulse<130 || pc>=0.5)) pv[r.pulse]=(pv[r.pulse]||0)+1+pc*0.5; });
+    var pk=Object.keys(pv).sort(function(a,b){ return pv[b]-pv[a]; })[0];
+    pool.sort(function(a,b){ return conf2(b)-conf2(a); });
+    var best=pool[0];
+    var out={}; for (var k in best) out[k]=best[k];
+    out.pulse = pk!=null ? +pk : null;
+    var share=pool.length/cands.length;
+    // 各角度意见不一，或者把握不大：标成“请核对”
+    out.unsure = share<0.6 || conf2(best)<0.25;
+    return finish(out);
   }
   function finish(r){
     var M=r.M, rows=r.rows;
-    var res={ok:!!r.ok, sys:r.ok?r.sys:null, dia:r.ok?r.dia:null, pulse:r.ok?r.pulse:null, raw:r.raw, deg:r.deg, reason:r.reason};
+    var res={ok:!!r.ok, sys:r.ok?r.sys:null, dia:r.ok?r.dia:null, pulse:r.ok?r.pulse:null, raw:r.raw, deg:r.deg, reason:r.reason, conf:r.conf||null, unsure:!!r.unsure};
     if (read.debug && M){
       var cv=document.createElement("canvas"); cv.width=M.w; cv.height=M.h; var cx=cv.getContext("2d");
       var id=cx.createImageData(M.w,M.h); for (var i=0;i<M.m.length;i++){ var v=M.m[i]?0:255; id.data[i*4]=v;id.data[i*4+1]=v;id.data[i*4+2]=v;id.data[i*4+3]=255; }
@@ -1684,7 +1706,7 @@ var BPOCR = (function(){
     $("form").reset(); med=null; $("err").textContent="";
     document.querySelectorAll("#med-chips .chip,#feel-chips .chip,#food-chips .chip,#meal-chips .chip").forEach(function(c){ c.setAttribute("aria-pressed","false"); });
     meal=null;
-    document.querySelectorAll(".field").forEach(function(f){ f.classList.remove("filled"); });
+    document.querySelectorAll(".field").forEach(function(f){ f.classList.remove("filled"); f.classList.remove("check"); });
     $("in-time").value = localInputValue(Date.now());
     $("scan-box").hidden = !opts.scan;
     $("sheet").hidden=false; document.body.style.overflow="hidden";
@@ -1784,7 +1806,9 @@ var BPOCR = (function(){
       if (scanCtl!==ctl) return;
       if (r.ok){
         scanCtl=null; fillFrom(r.sys,r.dia,r.pulse);
-        setScan("我看到的是 "+r.sys+"/"+r.dia+(r.pulse?"，心率 "+r.pulse:"")+"。和血压计上的对一下，没错就点下面的“保存”。"+(r.pulse?"":"心率没看清，可以自己填。"), false, "point");
+        document.querySelectorAll(".field").forEach(function(f){ f.classList.toggle("check", !!r.unsure); });
+        if (r.unsure) setScan("我读到的是 "+r.sys+"/"+r.dia+(r.pulse?"，心率 "+r.pulse:"")+"，但这次不太有把握。妈咪对着血压计仔细看看黄框里的数字，不对就直接改，没问题再点“保存”。", false, "think");
+        else setScan("我看到的是 "+r.sys+"/"+r.dia+(r.pulse?"，心率 "+r.pulse:"")+"。和血压计上的对一下，没错就点下面的“保存”。"+(r.pulse?"":"心率没看清，可以自己填。"), false, "point");
       } else if (sampler){
         askClaude(file, ctl);
       } else {
