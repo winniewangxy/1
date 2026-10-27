@@ -56,7 +56,22 @@
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 .vh{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0;opacity:0}
-label.btn,label.record-btn{cursor:pointer;-webkit-user-select:none;user-select:none;text-align:center}
+.pick{position:relative;overflow:hidden;cursor:pointer;-webkit-user-select:none;user-select:none;text-align:center}
+.pick-in{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:200px;z-index:2;margin:0;padding:0;border:0}
+.pick.live .pick-in{display:none}
+.cam{position:fixed;inset:0;z-index:60;background:#000;display:flex;flex-direction:column}
+.cam video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.cam-guide{position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);width:min(74vw,420px);aspect-ratio:4/5;max-height:62vh;border:3px solid rgba(255,255,255,.9);border-radius:22px;box-shadow:0 0 0 100vmax rgba(0,0,0,.35);display:flex;align-items:flex-start;justify-content:center}
+.cam-guide span{transform:translateY(-130%);color:#fff;font-size:18px;font-weight:600;text-shadow:0 1px 4px rgba(0,0,0,.6);white-space:nowrap}
+.cam-msg{position:absolute;left:16px;right:16px;top:calc(16px + env(safe-area-inset-top,0px));margin:0;background:rgba(0,0,0,.72);color:#fff;border-radius:16px;padding:14px 16px;font-size:17px;z-index:2}
+.cam-bar{position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:space-between;padding:18px max(24px,env(safe-area-inset-right,0px)) calc(24px + env(safe-area-inset-bottom,0px)) max(24px,env(safe-area-inset-left,0px));background:linear-gradient(transparent,rgba(0,0,0,.6))}
+.cam-x{border:0;background:rgba(255,255,255,.18);color:#fff;font-size:18px;border-radius:14px;padding:12px 18px;min-width:84px}
+.cam-sp{min-width:84px}
+.cam-shot{width:80px;height:80px;border-radius:50%;border:6px solid #fff;background:var(--heart);box-shadow:0 0 0 3px rgba(0,0,0,.25)}
+.cam-shot:disabled{opacity:.4}
+.cam-shot:active{transform:scale(.94)}
+.pick:focus-within{outline:3px solid var(--heart);outline-offset:3px}
+.pick:active{transform:scale(.98)}
 [hidden]{display:none!important}
 body{margin:0}
 html,body{height:100%}
@@ -298,11 +313,10 @@ textarea:focus{outline:none;border-color:var(--heart)}
       <div class="backup-btns"><button type="button" class="btn primary" id="backup-btn">一键备份</button><button type="button" class="backup-skip" id="backup-skip">这个月先不了</button></div>
     </div>
 
-    <label class="record-btn" id="scan-btn" for="photo-in" role="button" tabindex="0">
+    <div class="record-btn pick" id="scan-btn">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"></path><circle cx="12" cy="13" r="3.6"></circle></svg>
       拍一下血压计
-    </label>
-    <input type="file" id="photo-in" class="vh" accept="image/*" capture="environment" tabindex="-1" aria-hidden="true">
+    <input type="file" id="photo-in" class="pick-in" accept="image/*" aria-label="拍一下血压计"></div>
     <button class="record-btn secondary" id="open-form">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
       <span id="open-form-label">自己输入数字</span>
@@ -329,7 +343,7 @@ textarea:focus{outline:none;border-color:var(--heart)}
 
   <!-- 记录 -->
   <section id="view-list" class="today-list" hidden>
-    <div class="list-head"><h2 class="section-title">全部记录</h2><label class="btn" id="import-btn" for="import-in" role="button" tabindex="0">导入以前的记录</label></div>
+    <div class="list-head"><h2 class="section-title">全部记录</h2><span class="btn pick" id="import-btn">导入以前的记录<input type="file" class="pick-in imp-file" accept=".xlsx,.xls,.csv,.txt,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv,text/plain" aria-label="导入以前的记录"></span></div>
     <div id="all-rows" class="today-list"></div>
   </section>
 
@@ -357,7 +371,7 @@ textarea:focus{outline:none;border-color:var(--heart)}
         <button class="btn primary" id="export-csv" hidden>导出全部记录</button>
         <button class="btn danger" id="export-bad" hidden>只导出异常记录</button>
         <button class="btn" id="copy-text">复制文字</button>
-        <label class="btn" id="restore-btn" for="import-in" role="button" tabindex="0">导入以前的记录</label>
+        <span class="btn pick" id="restore-btn">导入以前的记录<input type="file" class="pick-in imp-file" accept=".xlsx,.xls,.csv,.txt,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv,text/plain" aria-label="导入以前的记录"></span>
       </div>
       <textarea id="copy-fallback" readonly hidden rows="6"></textarea>
     </div>
@@ -428,7 +442,6 @@ textarea:focus{outline:none;border-color:var(--heart)}
   </form>
 </div>
 
-<input type="file" id="import-in" accept=".xlsx,.xls,.csv,.txt,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv,text/plain" class="vh" tabindex="-1" aria-hidden="true">
 <div class="sheet" id="imp-sheet" hidden role="dialog" aria-modal="true" aria-labelledby="imp-title">
   <div class="wrap">
     <header><h2 id="imp-title">导入以前的记录</h2><button type="button" class="close" id="imp-close">取消</button></header>
@@ -446,6 +459,17 @@ textarea:focus{outline:none;border-color:var(--heart)}
     <h2 id="cele-title"></h2>
     <p id="cele-text"></p>
     <button type="button" class="save" id="cele-ok">好耶！</button>
+  </div>
+</div>
+
+<div class="cam" id="cam" hidden role="dialog" aria-modal="true" aria-label="拍血压计">
+  <video id="cam-v" playsinline autoplay muted></video>
+  <div class="cam-guide" aria-hidden="true"><span>把血压计的屏幕放进框里</span></div>
+  <p class="cam-msg" id="cam-msg" hidden></p>
+  <div class="cam-bar">
+    <button type="button" class="cam-x" id="cam-x">取消</button>
+    <button type="button" class="cam-shot" id="cam-shot" aria-label="拍照"></button>
+    <span class="cam-sp"></span>
   </div>
 </div>
 
@@ -1663,10 +1687,29 @@ var BPOCR = (function(){
   }
   function asNum(v, lo, hi){ var n=Math.round(Number(v)); return (isFinite(n) && n>=lo && n<=hi) ? n : null; }
 
-  // 点按钮本身就会打开相机/相册（label 关联到选文件框），这里只把上一次的选择清掉
-  $("scan-btn").addEventListener("click", function(){ $("photo-in").value=""; });
-  function keyOpen(el, input){ el.addEventListener("keydown", function(e){ if (e.key==="Enter"||e.key===" "){ e.preventDefault(); el.click(); } }); }
-  keyOpen($("scan-btn"));
+  // 透明的选文件框盖在按钮上，手指直接点在它上面。
+  // 点了以后如果手机根本没弹出相机/相册（有的浏览器“桌面模式”不支持），心心提示换个方式。
+  var pickWatch=null;
+  function watchPicker(kind){
+    var opened=false;
+    function mark(){ opened=true; }
+    window.addEventListener("blur", mark, {once:true});
+    document.addEventListener("visibilitychange", mark, {once:true});
+    clearTimeout(pickWatch);
+    pickWatch=setTimeout(function(){
+      window.removeEventListener("blur", mark); document.removeEventListener("visibilitychange", mark);
+      if (!opened && document.visibilityState==="visible"){
+        if (kind==="photo"){
+          if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia){
+            lsSet("xz-livecam","1"); applyCamMode();
+            say("妈咪，刚才的相机没打开，我换成小周血压本自己的相机啦。再点一次「拍一下血压计」试试～","point");
+          } else say("妈咪，这里打不开相机。可以点「自己输入数字」，或者用浏览器打开小周血压本再拍～","think");
+        }
+        else toast("这里好像打不开选文件的窗口，用浏览器打开小周血压本再试试");
+      }
+    }, 2500);
+  }
+  $("photo-in").addEventListener("click", function(){ this.value=""; watchPicker("photo"); });
   function fillFrom(s,d,p){
     if (s){ $("in-sys").value=s; $("in-sys").closest(".field").classList.add("filled"); }
     if (d){ $("in-dia").value=d; $("in-dia").closest(".field").classList.add("filled"); }
@@ -1697,13 +1740,18 @@ var BPOCR = (function(){
     });
   }
   $("photo-in").addEventListener("change", function(){
+    clearTimeout(pickWatch);
     var file=this.files && this.files[0]; if (!file) return;
+    scanPhoto(file, null);
+  });
+  // file：照片文件（Blob）；ready：已经画好的图（App 自带相机拍的 canvas），有就直接用
+  function scanPhoto(file, ready){
     openForm({scan:true});
     scanURL = URL.createObjectURL(file); $("scan-img").src = scanURL;
     setScan("正在看照片上的数字", true);
     var ctl = new AbortController(); scanCtl = ctl;
     // 先在手机上自己认（不联网），认不出来再请 Claude 帮忙
-    loadImage(file).then(function(img){
+    (ready ? Promise.resolve(ready) : loadImage(file)).then(function(img){
       return new Promise(function(res){ setTimeout(function(){ var r; try{ r=BPOCR.read(img); }catch(e){ r={ok:false}; } res(r); }, 30); });
     }, function(){ return {ok:false}; }).then(function(r){
       if (scanCtl!==ctl) return;
@@ -1717,6 +1765,48 @@ var BPOCR = (function(){
         setScan("这张照片我没看清。把血压计屏幕放在照片中间，正对着拍、别反光，再拍一张试试；或者直接把数字填进下面。", false);
       }
     });
+  }
+
+  /* ---------- App 自带相机（华为浏览器“添加到桌面”后打不开系统相机，就用这个） ---------- */
+  var camStream=null;
+  function appMode(){ try{ return ["standalone","fullscreen","minimal-ui"].some(function(m){ return matchMedia("(display-mode: "+m+")").matches; }) || navigator.standalone===true; }catch(e){ return false; } }
+  function useLiveCam(){ return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia) && (appMode() || lsGet("xz-livecam")==="1"); }
+  function applyCamMode(){ $("scan-btn").classList.toggle("live", useLiveCam()); }
+  function camMsg(t){ var m=$("cam-msg"); m.textContent=t; m.hidden=!t; }
+  function openCam(){
+    $("cam").hidden=false; document.body.style.overflow="hidden"; camMsg("正在打开相机…");
+    $("cam-shot").disabled=true;
+    navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"}, width:{ideal:1920}, height:{ideal:1440}}, audio:false})
+      .then(function(st){
+        camStream=st; var v=$("cam-v"); v.srcObject=st;
+        var p=v.play(); if (p && p.catch) p.catch(function(){});
+        camMsg(""); $("cam-shot").disabled=false;
+      })
+      .catch(function(e){
+        var n=e && e.name;
+        if (n==="NotAllowedError"||n==="SecurityError") camMsg("要先允许小周血压本使用相机才能拍。可以在弹出的提示里点「允许」，或者到手机「设置 → 应用」里打开相机权限。也可以先点「取消」，用「自己输入数字」。");
+        else camMsg("这里打不开相机。可以点「取消」，用「自己输入数字」；或者用浏览器打开小周血压本再拍。");
+      });
+  }
+  function closeCam(){
+    if (camStream){ camStream.getTracks().forEach(function(t){ t.stop(); }); camStream=null; }
+    $("cam-v").srcObject=null; $("cam").hidden=true; document.body.style.overflow="";
+  }
+  $("cam-x").addEventListener("click", closeCam);
+  $("cam-shot").addEventListener("click", function(){
+    var v=$("cam-v"), w=v.videoWidth, h=v.videoHeight;
+    if (!w || !h){ camMsg("相机还没准备好，等一下再按。"); return; }
+    var cv=document.createElement("canvas"); cv.width=w; cv.height=h;
+    cv.getContext("2d").drawImage(v,0,0,w,h);
+    closeCam();
+    cv.toBlob(function(blob){
+      if (!blob){ openForm(); return; }
+      scanPhoto(blob, cv);
+    }, "image/jpeg", 0.9);
+  });
+  $("scan-btn").addEventListener("click", function(e){
+    if (!$("scan-btn").classList.contains("live")) return;   // 普通浏览器：盖在上面的选文件框自己会打开相机
+    e.preventDefault(); openCam();
   });
   function enableScan(ns){
     if (!ns || typeof ns.limits!=="function") return;
@@ -1949,9 +2039,10 @@ var BPOCR = (function(){
 
   /* ---------- 导入以前的记录（Excel / CSV） ---------- */
   var imp=null, impBusy=false;
-  function openImport(e){ if (impBusy){ e.preventDefault(); return; } $("import-in").value=""; }
-  $("import-btn").addEventListener("click", openImport); keyOpen($("import-btn"));
-  $("restore-btn").addEventListener("click", openImport); keyOpen($("restore-btn"));
+  document.querySelectorAll(".imp-file").forEach(function(inp){
+    inp.addEventListener("click", function(e){ if (impBusy){ e.preventDefault(); return; } this.value=""; watchPicker("file"); });
+    inp.addEventListener("change", function(){ onImportFile(this.files && this.files[0]); });
+  });
   $("imp-close").addEventListener("click", function(){ if (!impBusy){ $("imp-sheet").hidden=true; document.body.style.overflow=""; } });
   function ymd(t){ var d=new Date(t); return d.getFullYear()+"年"+(d.getMonth()+1)+"月"+d.getDate()+"日"; }
   function impMsg(html){ $("imp-body").innerHTML=html; $("imp-go").hidden=true; }
@@ -1987,8 +2078,9 @@ var BPOCR = (function(){
       imp.orderGuessed=true; renderImport();
     });
   }
-  $("import-in").addEventListener("change", function(){
-    var f=this.files && this.files[0]; if (!f) return;
+  function onImportFile(f){
+    if (!f) return;
+    clearTimeout(pickWatch);
     $("imp-sheet").hidden=false; document.body.style.overflow="hidden";
     impMsg('<div class="sum">正在读表格…</div>');
     BPIMPORT.readFile(f).then(function(sheets){
@@ -2001,7 +2093,8 @@ var BPOCR = (function(){
       else if (m==="no_inflate") impMsg('<div class="imp-err">这个浏览器版本太旧，读不了 .xlsx。请换用最新的 Chrome，或者把表格另存为 CSV 再导入。</div>');
       else impMsg('<div class="imp-err">这个文件打不开。确认是 Excel（.xlsx）或 CSV 表格，再试一次。</div>');
     });
-  });
+  }
+
   $("imp-go").addEventListener("click", function(){
     if (!imp || !imp.items.length || impBusy) return;
     var list=imp.items.map(function(x){
@@ -2087,6 +2180,8 @@ var BPOCR = (function(){
   // 在微信内置浏览器里：数据可能被清，提示换浏览器；装 App 的卡片也不显示
   var IN_WECHAT = /MicroMessenger/i.test(navigator.userAgent);
   if (IN_WECHAT && !HAS_CLAUDE){ $("wx-tip").hidden=false; IS_APP_HOST=false; }
+
+  applyCamMode();
 
   /* ---------- 启动 ---------- */
   renderAllViews(); defaultSay();
