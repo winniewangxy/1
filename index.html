@@ -54,6 +54,9 @@
   color-scheme:dark;}
 
 *{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+.vh{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0;opacity:0}
+label.btn,label.record-btn{cursor:pointer;-webkit-user-select:none;user-select:none;text-align:center}
 [hidden]{display:none!important}
 body{margin:0}
 html,body{height:100%}
@@ -99,10 +102,10 @@ button{cursor:pointer}
 .c-low{color:var(--low);background:var(--low-soft)}
 .empty{color:var(--muted);font-size:17px}
 
-.record-btn{border:0;border-radius:26px;background:var(--heart);color:var(--heart-ink);font-family:var(--f-display);font-size:28px;letter-spacing:.1em;padding:22px 16px;box-shadow:0 10px 24px color-mix(in srgb,var(--heart) 35%,transparent);display:flex;align-items:center;justify-content:center;gap:12px;touch-action:manipulation}
+.record-btn{border:0;border-radius:26px;background:var(--heart);color:var(--heart-ink);font-family:var(--f-display);font-size:clamp(20px,7.2vw,28px);letter-spacing:.06em;white-space:nowrap;padding:22px 16px;box-shadow:0 10px 24px color-mix(in srgb,var(--heart) 35%,transparent);display:flex;align-items:center;justify-content:center;gap:12px;touch-action:manipulation}
 .record-btn:active{transform:scale(.98)}
 .record-btn svg{width:30px;height:30px}
-.record-btn.secondary{background:var(--surface);color:var(--heart);border:3px solid var(--heart-soft);box-shadow:none;font-size:22px;padding:16px}
+.record-btn.secondary{background:var(--surface);color:var(--heart);border:3px solid var(--heart-soft);box-shadow:none;font-size:clamp(18px,6vw,22px);padding:16px}
 .scan-box{display:flex;gap:12px;align-items:center;background:var(--surface);border-radius:22px;padding:10px}
 .scan-box img{width:96px;height:96px;object-fit:cover;border-radius:14px;flex:none;background:var(--sunk)}
 .scan-msg{flex:1;min-width:0;font-size:17px}
@@ -246,6 +249,23 @@ textarea:focus{outline:none;border-color:var(--heart)}
 @keyframes pop{0%{transform:scale(.7);opacity:0}100%{transform:scale(1);opacity:1}}
 .toast{position:fixed;left:50%;bottom:calc(100px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:40;background:var(--ink);color:var(--bg);padding:12px 20px;border-radius:16px;font-size:16px;max-width:calc(100% - 32px);text-align:center}
 
+/* 窄屏 / 系统大字体（如华为 P40 调大字体）时自动收一收 */
+.top{flex-wrap:wrap}
+.brand{font-size:clamp(21px,6.8vw,26px);white-space:nowrap}
+.date{font-size:clamp(13px,4vw,16px);white-space:nowrap}
+.xin{width:clamp(84px,30vw,128px);height:clamp(84px,30vw,128px)}
+.bubble{font-size:clamp(16px,4.9vw,19px)}
+.reading .big{font-size:clamp(44px,15vw,58px)}
+.field input{font-size:clamp(32px,11vw,44px)}
+.field label{width:auto;min-width:4.2em}
+@media (max-width:330px){
+  .guide{flex-direction:column;align-items:stretch}
+  .xin{align-self:center}
+  .bubble{border-radius:22px}
+  .tabs button{font-size:14px}
+  .field{gap:8px;padding:12px}
+  .field .u{width:auto;font-size:13px}
+}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 
@@ -278,11 +298,11 @@ textarea:focus{outline:none;border-color:var(--heart)}
       <div class="backup-btns"><button type="button" class="btn primary" id="backup-btn">一键备份</button><button type="button" class="backup-skip" id="backup-skip">这个月先不了</button></div>
     </div>
 
-    <button class="record-btn" id="scan-btn">
+    <label class="record-btn" id="scan-btn" for="photo-in" role="button" tabindex="0">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"></path><circle cx="12" cy="13" r="3.6"></circle></svg>
       拍一下血压计
-    </button>
-    <input type="file" id="photo-in" accept="image/*" capture="environment" hidden>
+    </label>
+    <input type="file" id="photo-in" class="vh" accept="image/*" capture="environment" tabindex="-1" aria-hidden="true">
     <button class="record-btn secondary" id="open-form">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
       <span id="open-form-label">自己输入数字</span>
@@ -309,7 +329,7 @@ textarea:focus{outline:none;border-color:var(--heart)}
 
   <!-- 记录 -->
   <section id="view-list" class="today-list" hidden>
-    <div class="list-head"><h2 class="section-title">全部记录</h2><button class="btn" id="import-btn">导入以前的记录</button></div>
+    <div class="list-head"><h2 class="section-title">全部记录</h2><label class="btn" id="import-btn" for="import-in" role="button" tabindex="0">导入以前的记录</label></div>
     <div id="all-rows" class="today-list"></div>
   </section>
 
@@ -337,7 +357,7 @@ textarea:focus{outline:none;border-color:var(--heart)}
         <button class="btn primary" id="export-csv" hidden>导出全部记录</button>
         <button class="btn danger" id="export-bad" hidden>只导出异常记录</button>
         <button class="btn" id="copy-text">复制文字</button>
-        <button class="btn" id="restore-btn">导入以前的记录</button>
+        <label class="btn" id="restore-btn" for="import-in" role="button" tabindex="0">导入以前的记录</label>
       </div>
       <textarea id="copy-fallback" readonly hidden rows="6"></textarea>
     </div>
@@ -408,7 +428,7 @@ textarea:focus{outline:none;border-color:var(--heart)}
   </form>
 </div>
 
-<input type="file" id="import-in" accept=".xlsx,.xls,.csv,.txt,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv,text/plain" hidden>
+<input type="file" id="import-in" accept=".xlsx,.xls,.csv,.txt,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv,text/plain" class="vh" tabindex="-1" aria-hidden="true">
 <div class="sheet" id="imp-sheet" hidden role="dialog" aria-modal="true" aria-labelledby="imp-title">
   <div class="wrap">
     <header><h2 id="imp-title">导入以前的记录</h2><button type="button" class="close" id="imp-close">取消</button></header>
@@ -1643,7 +1663,10 @@ var BPOCR = (function(){
   }
   function asNum(v, lo, hi){ var n=Math.round(Number(v)); return (isFinite(n) && n>=lo && n<=hi) ? n : null; }
 
-  $("scan-btn").addEventListener("click", function(){ $("photo-in").value=""; $("photo-in").click(); });
+  // 点按钮本身就会打开相机/相册（label 关联到选文件框），这里只把上一次的选择清掉
+  $("scan-btn").addEventListener("click", function(){ $("photo-in").value=""; });
+  function keyOpen(el, input){ el.addEventListener("keydown", function(e){ if (e.key==="Enter"||e.key===" "){ e.preventDefault(); el.click(); } }); }
+  keyOpen($("scan-btn"));
   function fillFrom(s,d,p){
     if (s){ $("in-sys").value=s; $("in-sys").closest(".field").classList.add("filled"); }
     if (d){ $("in-dia").value=d; $("in-dia").closest(".field").classList.add("filled"); }
@@ -1811,19 +1834,37 @@ var BPOCR = (function(){
   /* ---------- 导出 / 复制 ---------- */
   function fullDate(t){ var d=new Date(t); return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate()); }
   function csvCell(v){ v=String(v==null?"":v); return /[",\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; }
-  function saveFile(fname, data, mime){
-    if (!dl){
+  // 存文件：手机上优先用系统「分享」（iPhone 桌面 App 里网页下载会被拦掉），不行再用下载
+  function saveFile(fname, data, mime, opts){
+    opts=opts||{};
+    if (dl){
+      return dl.save({filename:fname, data:data})
+        .then(function(){ toast("表格已保存"); if (opts.onDone) opts.onDone(); })
+        .catch(function(e){ if (e && e.code!=="declined") toast("这里存不了文件，可以用“复制文字”"); });
+    }
+    var file=null; try{ file=new File([data], fname, {type:mime}); }catch(e){}
+    var canShare=false;
+    if (file && navigator.share && navigator.canShare){ try{ canShare=navigator.canShare({files:[file]}); }catch(e){} }
+    var touch=("ontouchstart" in window) || navigator.maxTouchPoints>0;
+    if (canShare && touch){
+      navigator.share({files:[file], title:opts.title||"小周血压本", text:opts.text||""})
+        .then(function(){ toast(opts.sharedMsg || "表格发出去啦"); if (opts.onDone) opts.onDone(); })
+        .catch(function(e){
+          if (e && e.name==="AbortError") return;           // 妈咪自己点了取消
+          download();
+        });
+      return;
+    }
+    download();
+    function download(){
       try{
         var url=URL.createObjectURL(new Blob([data],{type:mime}));
         var a=document.createElement("a"); a.href=url; a.download=fname; document.body.appendChild(a); a.click(); a.remove();
-        setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
-        toast("表格已下载，在手机的“下载”里能找到");
-      }catch(e){ toast("下载不了，可以用“复制文字”"); }
-      return;
+        setTimeout(function(){ URL.revokeObjectURL(url); }, 60000);
+        toast("表格开始下载了：「"+fname+"」。找不到的话，用「复制文字」也可以");
+        if (opts.onDone) opts.onDone();
+      }catch(e){ toast("这台手机存不了文件，可以用“复制文字”"); }
     }
-    dl.save({filename:fname, data:data})
-      .then(function(){ toast("表格已保存"); })
-      .catch(function(e){ if (e && e.code!=="declined") toast("这里存不了文件，可以用“复制文字”"); });
   }
   function exportXlsx(onlyBad, justBuild){
     if (!dl && !STANDALONE) return null;
@@ -1852,8 +1893,12 @@ var BPOCR = (function(){
     });
     var fname=(onlyBad ? "血压异常记录_" : "血压记录_")+fullDate(Date.now())+".xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
     if (justBuild) return {fname:fname, bytes:bytes, mime:mime};
-    saveFile(fname, bytes, mime);
-    if (!onlyBad) markBackup();
+    saveFile(fname, bytes, mime, {
+      title: onlyBad ? "血压异常记录" : "血压记录",
+      text: (onlyBad ? "妈咪的血压异常记录" : "妈咪的血压记录")+"（"+fullDate(Date.now())+"）",
+      sharedMsg: "表格发出去啦。想存在手机里，就在分享菜单选「存储到文件」",
+      onDone: onlyBad ? null : markBackup
+    });
     return true;
   }
   $("export-csv").addEventListener("click", function(){ exportXlsx(false); });
@@ -1882,20 +1927,11 @@ var BPOCR = (function(){
   }
   $("backup-btn").addEventListener("click", function(){
     var f=exportXlsx(false, true); if (!f) return;
-    var file=null;
-    try{ file=new File([f.bytes], f.fname, {type:f.mime}); }catch(e){}
-    function done(msg){ markBackup(); say("备份好啦！谢谢妈咪～这样记录就有两份，放心啦。","cheer"); toast(msg); }
-    if (file && navigator.canShare && navigator.share){
-      var ok=false; try{ ok=navigator.canShare({files:[file]}); }catch(e){}
-      if (ok){
-        navigator.share({files:[file], title:"小周血压本备份", text:"妈咪的血压记录备份（"+fullDate(Date.now())+"）"})
-          .then(function(){ done("备份发出去啦"); })
-          .catch(function(e){ if (!(e && e.name==="AbortError")){ saveFile(f.fname, f.bytes, f.mime); done("备份表格已保存"); } });
-        return;
-      }
-    }
-    saveFile(f.fname, f.bytes, f.mime);
-    done("备份表格已保存，可以发给心心");
+    saveFile(f.fname, f.bytes, f.mime, {
+      title:"小周血压本备份", text:"妈咪的血压记录备份（"+fullDate(Date.now())+"）",
+      sharedMsg:"备份发出去啦",
+      onDone:function(){ markBackup(); say("备份好啦！谢谢妈咪～这样记录就有两份，放心啦。","cheer"); }
+    });
   });
   $("backup-skip").addEventListener("click", function(){ lsSet("xz-backup-skip", monthKey()); renderBackup(); defaultSay(); });
   $("export-bad").addEventListener("click", function(){ exportXlsx(true); });
@@ -1913,9 +1949,9 @@ var BPOCR = (function(){
 
   /* ---------- 导入以前的记录（Excel / CSV） ---------- */
   var imp=null, impBusy=false;
-  function openImport(){ if (impBusy) return; $("import-in").value=""; $("import-in").click(); }
-  $("import-btn").addEventListener("click", openImport);
-  $("restore-btn").addEventListener("click", openImport);
+  function openImport(e){ if (impBusy){ e.preventDefault(); return; } $("import-in").value=""; }
+  $("import-btn").addEventListener("click", openImport); keyOpen($("import-btn"));
+  $("restore-btn").addEventListener("click", openImport); keyOpen($("restore-btn"));
   $("imp-close").addEventListener("click", function(){ if (!impBusy){ $("imp-sheet").hidden=true; document.body.style.overflow=""; } });
   function ymd(t){ var d=new Date(t); return d.getFullYear()+"年"+(d.getMonth()+1)+"月"+d.getDate()+"日"; }
   function impMsg(html){ $("imp-body").innerHTML=html; $("imp-go").hidden=true; }
