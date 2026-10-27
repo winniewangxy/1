@@ -192,6 +192,13 @@ textarea:focus{outline:none;border-color:var(--heart)}
 .err{color:var(--crit);font-size:16px;min-height:1.4em;margin:0}
 .save{border:0;border-radius:24px;background:var(--heart);color:var(--heart-ink);font-family:var(--f-display);font-size:28px;letter-spacing:.2em;padding:18px}
 
+.backup{background:var(--elev-soft);border-radius:22px;padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.backup-txt{display:flex;flex-direction:column;gap:2px;min-width:0}
+.backup-txt b{font-family:var(--f-display);font-weight:400;font-size:21px;color:var(--elev)}
+.backup-txt span{font-size:15px;color:var(--ink)}
+.backup-btns{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.backup-btns .btn{padding:12px 22px;font-size:17px}
+.backup-skip{border:0;background:none;color:var(--muted);font-size:15px;padding:8px 4px}
 .install{background:var(--surface);border:2px solid var(--heart-soft);border-radius:22px;padding:12px 12px 12px 14px;display:flex;align-items:center;gap:12px}
 .install img{width:52px;height:52px;border-radius:14px;flex:none;object-fit:cover;background:var(--heart-soft)}
 .install-txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
@@ -259,6 +266,11 @@ textarea:focus{outline:none;border-color:var(--heart)}
     </div>
 
     <div class="latest" id="latest"></div>
+
+    <div class="backup" id="backup-card" hidden>
+      <div class="backup-txt"><b>妈咪，该备份啦</b><span id="backup-sub"></span></div>
+      <div class="backup-btns"><button type="button" class="btn primary" id="backup-btn">一键备份</button><button type="button" class="backup-skip" id="backup-skip">这个月先不了</button></div>
+    </div>
 
     <button class="record-btn" id="scan-btn">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"></path><circle cx="12" cy="13" r="3.6"></circle></svg>
@@ -1356,6 +1368,7 @@ var BPOCR = (function(){
   }
   function defaultSay(){
     if (mode==="loading") return say("我在找妈咪的记录…","think");
+    if (backupDue()) return say(greeting()+(new Date().getDate()<=3 ? "新的一个月到啦，" : "")+"该备份啦！点下面的「一键备份」，把记录发给我存一份～","point");
     if (!readings.length) return say(greeting()+"我是心心～测完血压，点“拍一下血压计”，我帮你把数字读出来！", "wave");
     var today = readings.filter(function(r){ return dayKey(r.t)===dayKey(Date.now()); });
     var h = new Date().getHours();
@@ -1545,14 +1558,14 @@ var BPOCR = (function(){
   function renderNote(){
     var n=$("storage-note");
     if (mode==="local"){ n.hidden=false; n.textContent = STANDALONE
-      ? "记录保存在这台手机的浏览器里。不要清除浏览器数据；每个月到「趋势」页点一次「导出表格」备份，换手机时用「导入以前的记录」导回来。"
+      ? "记录保存在这台手机的浏览器里。不要清除浏览器数据；每个月 1 号心心会提醒备份，换手机时用「导入以前的记录」导回来。"
       : "记录现在只保存在这台手机的浏览器里。在 Claude App 里登录后打开，记录会自动保存在云端，换手机也不会丢。"; }
     else n.hidden=true;
   }
 
   function renderAllViews(){
     $("today-date").textContent = (new Date().getMonth()+1)+"月"+new Date().getDate()+"日 星期"+WEEK[new Date().getDay()];
-    renderLatest(); renderToday(); renderAll(); renderChart(); renderNote(); renderStreak();
+    renderLatest(); renderToday(); renderAll(); renderChart(); renderNote(); renderStreak(); renderBackup();
   }
 
   /* ---------- 存储 ---------- */
@@ -1806,11 +1819,11 @@ var BPOCR = (function(){
       .then(function(){ toast("表格已保存"); })
       .catch(function(e){ if (e && e.code!=="declined") toast("这里存不了文件，可以用“复制文字”"); });
   }
-  function exportXlsx(onlyBad){
-    if (!dl && !STANDALONE) return;
+  function exportXlsx(onlyBad, justBuild){
+    if (!dl && !STANDALONE) return null;
     var s=sorted();
     if (onlyBad) s=s.filter(function(r){ var k=classify(r.sys,r.dia); return k==="high"||k==="crit"||k==="low"; });
-    if (!s.length){ toast(onlyBad ? "没有偏高或偏低的记录，妈咪很棒！" : "还没有记录可以导出"); return; }
+    if (!s.length){ toast(onlyBad ? "没有偏高或偏低的记录，妈咪很棒！" : "还没有记录可以导出"); return null; }
     var hi=0, lo=0;
     var rows=s.map(function(r){
       var k=classify(r.sys,r.dia), level = (k==="high"||k==="crit") ? "high" : k==="low" ? "low" : "";
@@ -1831,9 +1844,54 @@ var BPOCR = (function(){
       rows: rows,
       foot:"说明：红色＝偏高（高压≥135 或 低压≥85）或很高（≥180/110）；蓝色＝偏低（高压<90 或 低压<60）。按家庭自测常用标准，仅供参考，请以医生意见为准。导出于 "+fullDate(Date.now())+"。"
     });
-    saveFile((onlyBad ? "血压异常记录_" : "血压记录_")+fullDate(Date.now())+".xlsx", bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    var fname=(onlyBad ? "血压异常记录_" : "血压记录_")+fullDate(Date.now())+".xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    if (justBuild) return {fname:fname, bytes:bytes, mime:mime};
+    saveFile(fname, bytes, mime);
+    if (!onlyBad) markBackup();
+    return true;
   }
   $("export-csv").addEventListener("click", function(){ exportXlsx(false); });
+
+  /* ---------- 每月备份提醒 ---------- */
+  function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+  function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
+  function monthStart(){ var n=new Date(); return new Date(n.getFullYear(), n.getMonth(), 1).getTime(); }
+  function monthKey(){ var n=new Date(); return n.getFullYear()+"-"+(n.getMonth()+1); }
+  function backupDue(){
+    if (mode!=="local" || !readings.length) return false;
+    if (lsGet("xz-backup-skip")===monthKey()) return false;
+    var m1=monthStart(), last=+lsGet("xz-last-backup")||0;
+    if (last>=m1) return false;
+    var oldest=Math.min.apply(null, readings.map(function(r){ return r.t; }));
+    return oldest<m1;               // 上个月就有记录了，这个月还没备份
+  }
+  function markBackup(){ lsSet("xz-last-backup", String(Date.now())); renderBackup(); }
+  function renderBackup(){
+    var el=$("backup-card"); if (!el) return;
+    el.hidden=!backupDue();
+    if (!el.hidden){
+      var last=+lsGet("xz-last-backup")||0;
+      $("backup-sub").textContent = (last ? "上次备份是 "+(new Date(last).getMonth()+1)+"月"+new Date(last).getDate()+"日。" : "还没有备份过。")+"点一下，把全部记录存成表格发给心心，换手机也不怕丢。";
+    }
+  }
+  $("backup-btn").addEventListener("click", function(){
+    var f=exportXlsx(false, true); if (!f) return;
+    var file=null;
+    try{ file=new File([f.bytes], f.fname, {type:f.mime}); }catch(e){}
+    function done(msg){ markBackup(); say("备份好啦！谢谢妈咪～这样记录就有两份，放心啦。","cheer"); toast(msg); }
+    if (file && navigator.canShare && navigator.share){
+      var ok=false; try{ ok=navigator.canShare({files:[file]}); }catch(e){}
+      if (ok){
+        navigator.share({files:[file], title:"小周血压本备份", text:"妈咪的血压记录备份（"+fullDate(Date.now())+"）"})
+          .then(function(){ done("备份发出去啦"); })
+          .catch(function(e){ if (!(e && e.name==="AbortError")){ saveFile(f.fname, f.bytes, f.mime); done("备份表格已保存"); } });
+        return;
+      }
+    }
+    saveFile(f.fname, f.bytes, f.mime);
+    done("备份表格已保存，可以发给心心");
+  });
+  $("backup-skip").addEventListener("click", function(){ lsSet("xz-backup-skip", monthKey()); renderBackup(); defaultSay(); });
   $("export-bad").addEventListener("click", function(){ exportXlsx(true); });
   $("copy-text").addEventListener("click", function(){
     var data=inRange().slice().reverse();
