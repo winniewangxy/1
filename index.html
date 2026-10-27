@@ -63,12 +63,16 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 .cam video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .cam-guide{position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);width:min(74vw,420px);aspect-ratio:4/5;max-height:62vh;border:3px solid rgba(255,255,255,.9);border-radius:22px;box-shadow:0 0 0 100vmax rgba(0,0,0,.35);display:flex;align-items:flex-start;justify-content:center}
 .cam-guide span{transform:translateY(-130%);color:#fff;font-size:18px;font-weight:600;text-shadow:0 1px 4px rgba(0,0,0,.6);white-space:nowrap}
-.cam-msg{position:absolute;left:16px;right:16px;top:calc(16px + env(safe-area-inset-top,0px));margin:0;background:rgba(0,0,0,.72);color:#fff;border-radius:16px;padding:14px 16px;font-size:17px;z-index:2}
+.cam-msg{position:absolute;left:16px;right:16px;top:calc(16px + env(safe-area-inset-top,0px));margin:0;background:rgba(0,0,0,.78);color:#fff;border-radius:16px;padding:14px 16px;font-size:17px;z-index:3;display:flex;flex-direction:column;gap:12px}
+.cam-msg p{margin:0}
+.cam-sys{display:block;background:var(--heart);color:#fff;border-radius:14px;padding:14px;font-size:19px;font-weight:700}
+.cam-alb{border:0;background:rgba(255,255,255,.18);color:#fff;font-size:18px;border-radius:14px;padding:12px 18px;min-width:84px}
 .cam-bar{position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:space-between;padding:18px max(24px,env(safe-area-inset-right,0px)) calc(24px + env(safe-area-inset-bottom,0px)) max(24px,env(safe-area-inset-left,0px));background:linear-gradient(transparent,rgba(0,0,0,.6))}
 .cam-x{border:0;background:rgba(255,255,255,.18);color:#fff;font-size:18px;border-radius:14px;padding:12px 18px;min-width:84px}
 .cam-sp{min-width:84px}
 .cam-shot{width:80px;height:80px;border-radius:50%;border:6px solid #fff;background:var(--heart);box-shadow:0 0 0 3px rgba(0,0,0,.25)}
 .cam-shot:disabled{opacity:.4}
+.cam.err .cam-guide,.cam.err .cam-shot{visibility:hidden}
 .cam-shot:active{transform:scale(.94)}
 .pick:focus-within{outline:3px solid var(--heart);outline-offset:3px}
 .pick:active{transform:scale(.98)}
@@ -465,11 +469,14 @@ textarea:focus{outline:none;border-color:var(--heart)}
 <div class="cam" id="cam" hidden role="dialog" aria-modal="true" aria-label="拍血压计">
   <video id="cam-v" playsinline autoplay muted></video>
   <div class="cam-guide" aria-hidden="true"><span>把血压计的屏幕放进框里</span></div>
-  <p class="cam-msg" id="cam-msg" hidden></p>
+  <div class="cam-msg" id="cam-box" hidden>
+    <p id="cam-msg"></p>
+    <span class="cam-sys pick" id="cam-sys" hidden>用手机相机拍<input type="file" class="pick-in cam-file" accept="image/*" capture="environment" aria-label="用手机相机拍"></span>
+  </div>
   <div class="cam-bar">
     <button type="button" class="cam-x" id="cam-x">取消</button>
     <button type="button" class="cam-shot" id="cam-shot" aria-label="拍照"></button>
-    <span class="cam-sp"></span>
+    <span class="cam-alb pick">相册<input type="file" class="pick-in cam-file" accept="image/*" aria-label="从相册选照片"></span>
   </div>
 </div>
 
@@ -1702,7 +1709,7 @@ var BPOCR = (function(){
         if (kind==="photo"){
           if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia){
             lsSet("xz-livecam","1"); applyCamMode();
-            say("妈咪，刚才的相机没打开，我换成小周血压本自己的相机啦。再点一次「拍一下血压计」试试～","point");
+            say("妈咪，刚才的相机没打开，再点一次「拍一下血压计」试试～","point");
           } else say("妈咪，这里打不开相机。可以点「自己输入数字」，或者用浏览器打开小周血压本再拍～","think");
         }
         else toast("这里好像打不开选文件的窗口，用浏览器打开小周血压本再试试");
@@ -1770,9 +1777,9 @@ var BPOCR = (function(){
   /* ---------- App 自带相机（华为浏览器“添加到桌面”后打不开系统相机，就用这个） ---------- */
   var camStream=null;
   function appMode(){ try{ return ["standalone","fullscreen","minimal-ui"].some(function(m){ return matchMedia("(display-mode: "+m+")").matches; }) || navigator.standalone===true; }catch(e){ return false; } }
-  function useLiveCam(){ return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia) && (appMode() || lsGet("xz-livecam")==="1"); }
+  function useLiveCam(){ return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia) && window.isSecureContext!==false && lsGet("xz-livecam")!=="0"; }
   function applyCamMode(){ $("scan-btn").classList.toggle("live", useLiveCam()); }
-  function camMsg(t){ var m=$("cam-msg"); m.textContent=t; m.hidden=!t; }
+  function camMsg(t, sys){ $("cam-msg").textContent=t; $("cam-box").hidden=!t; $("cam-sys").hidden=!sys; $("cam").classList.toggle("err", !!sys); }
   function openCam(){
     $("cam").hidden=false; document.body.style.overflow="hidden"; camMsg("正在打开相机…");
     $("cam-shot").disabled=true;
@@ -1784,8 +1791,8 @@ var BPOCR = (function(){
       })
       .catch(function(e){
         var n=e && e.name;
-        if (n==="NotAllowedError"||n==="SecurityError") camMsg("要先允许小周血压本使用相机才能拍。可以在弹出的提示里点「允许」，或者到手机「设置 → 应用」里打开相机权限。也可以先点「取消」，用「自己输入数字」。");
-        else camMsg("这里打不开相机。可以点「取消」，用「自己输入数字」；或者用浏览器打开小周血压本再拍。");
+        if (n==="NotAllowedError"||n==="SecurityError") camMsg("小周血压本还没有相机权限。点下面的按钮用手机相机拍，或者点右下角「相册」选照片。", true);
+        else camMsg("这里打不开小周血压本自己的相机。点下面的按钮用手机相机拍，或者点右下角「相册」选照片。", true);
       });
   }
   function closeCam(){
@@ -1793,6 +1800,13 @@ var BPOCR = (function(){
     $("cam-v").srcObject=null; $("cam").hidden=true; document.body.style.overflow="";
   }
   $("cam-x").addEventListener("click", closeCam);
+  document.querySelectorAll(".cam-file").forEach(function(inp){
+    inp.addEventListener("click", function(){ this.value=""; });
+    inp.addEventListener("change", function(){
+      var f=this.files && this.files[0]; if (!f) return;
+      closeCam(); scanPhoto(f, null);
+    });
+  });
   $("cam-shot").addEventListener("click", function(){
     var v=$("cam-v"), w=v.videoWidth, h=v.videoHeight;
     if (!w || !h){ camMsg("相机还没准备好，等一下再按。"); return; }
