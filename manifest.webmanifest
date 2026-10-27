@@ -1,0 +1,18 @@
+{
+  "name": "小周血压本",
+  "short_name": "小周血压本",
+  "description": "给妈咪的血压记录本：拍一下血压计就能记，还有心心陪着。",
+  "lang": "zh-CN",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FBF6F7",
+  "theme_color": "#E5485F",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

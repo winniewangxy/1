@@ -5,7 +5,12 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#E5485F">
 <meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="小周血压本">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
 <title>小周血压本</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <meta name="xz-edition" content="web">
@@ -176,6 +181,8 @@ button{cursor:pointer}
 .chips{display:flex;flex-wrap:wrap;gap:10px}
 .chip{border:2px solid var(--line);background:var(--surface);border-radius:999px;padding:9px 16px;font-size:17px}
 .chip[aria-pressed="true"]{border-color:var(--dia);background:var(--dia-soft);color:var(--dia);font-weight:700}
+.chip.food[aria-pressed="true"]{border-color:var(--elev);background:var(--elev-soft);color:var(--elev);font-weight:700}
+.tag.food{background:var(--elev-soft);color:var(--elev)}
 .chip.feel[aria-pressed="true"]{border-color:var(--heart);background:var(--heart-soft);color:var(--heart)}
 .sub-label{font-size:16px;color:var(--muted);margin:0 0 -6px}
 textarea{width:100%;border:2px solid var(--line);background:var(--surface);border-radius:18px;padding:12px 14px;font-size:17px;resize:vertical;min-height:64px}
@@ -185,6 +192,13 @@ textarea:focus{outline:none;border-color:var(--heart)}
 .err{color:var(--crit);font-size:16px;min-height:1.4em;margin:0}
 .save{border:0;border-radius:24px;background:var(--heart);color:var(--heart-ink);font-family:var(--f-display);font-size:28px;letter-spacing:.2em;padding:18px}
 
+.install{background:var(--surface);border:2px solid var(--heart-soft);border-radius:22px;padding:12px 12px 12px 14px;display:flex;align-items:center;gap:12px}
+.install img{width:52px;height:52px;border-radius:14px;flex:none;object-fit:cover;background:var(--heart-soft)}
+.install-txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.install-txt b{font-size:17px}
+.install-txt span{font-size:14px;color:var(--muted)}
+.install-btns{display:flex;flex-direction:column;align-items:center;gap:2px;flex:none}
+.install-x{border:0;background:none;color:var(--muted);font-size:20px;line-height:1;padding:4px 8px}
 .streak{background:var(--surface);border-radius:22px;padding:14px 16px;display:flex;flex-direction:column;gap:10px}
 .streak-top{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
 .streak-k{font-family:var(--f-display);font-size:20px}
@@ -256,6 +270,12 @@ textarea:focus{outline:none;border-color:var(--heart)}
       <span id="open-form-label">自己输入数字</span>
     </button>
 
+    <div class="install" id="install-card" hidden>
+      <img id="install-ico" alt="">
+      <div class="install-txt"><b>把小周血压本装到手机上</b><span id="install-sub">装好以后，桌面上会有心心的图标，点开就能记，没网也能用。</span></div>
+      <div class="install-btns"><button type="button" class="btn primary" id="install-btn">安装</button><button type="button" class="install-x" id="install-x" aria-label="先不装">×</button></div>
+    </div>
+
     <div class="streak" id="streak" hidden>
       <div class="streak-top"><span class="streak-k">连续记录</span><span class="streak-v"><span class="num" id="streak-n">0</span> 天</span></div>
       <div class="badges" id="badges"></div>
@@ -294,9 +314,10 @@ textarea:focus{outline:none;border-color:var(--heart)}
     <div class="stats" id="stats"></div>
     <div class="share">
       <h3 class="section-title" style="font-size:19px;margin:0">给医生看</h3>
-      <p>复诊时可以把记录导出成表格，或者复制成文字发给医生、发到家庭群。</p>
+      <p>复诊时可以导出 Excel 表格给医生看：偏高、很高的记录标红，偏低的标蓝。也可以复制成文字发到 WhatsApp 或家庭群。</p>
       <div class="btns">
-        <button class="btn primary" id="export-csv" hidden>导出表格</button>
+        <button class="btn primary" id="export-csv" hidden>导出全部记录</button>
+        <button class="btn danger" id="export-bad" hidden>只导出异常记录</button>
         <button class="btn" id="copy-text">复制文字</button>
         <button class="btn" id="restore-btn">导入以前的记录</button>
       </div>
@@ -346,7 +367,22 @@ textarea:focus{outline:none;border-color:var(--heart)}
       <button type="button" class="chip feel" aria-pressed="false">心慌</button>
       <button type="button" class="chip feel" aria-pressed="false">没睡好</button>
     </div>
-    <textarea id="in-note" placeholder="还想记点什么？比如：刚散完步、喝了咖啡" maxlength="200"></textarea>
+
+    <p class="sub-label">测之前吃了喝了什么（可多选）</p>
+    <div class="chips" id="food-chips">
+      <button type="button" class="chip food" aria-pressed="false">喝了咖啡</button>
+      <button type="button" class="chip food" aria-pressed="false">喝了茶</button>
+      <button type="button" class="chip food" aria-pressed="false">喝了奶茶</button>
+      <button type="button" class="chip food" aria-pressed="false">吃了重油重盐</button>
+    </div>
+
+    <p class="sub-label">吃饭情况</p>
+    <div class="chips" id="meal-chips">
+      <button type="button" class="chip" data-meal="空腹" aria-pressed="false">空腹</button>
+      <button type="button" class="chip" data-meal="半饱" aria-pressed="false">半饱</button>
+      <button type="button" class="chip" data-meal="饱腹" aria-pressed="false">饱腹</button>
+    </div>
+    <textarea id="in-note" placeholder="还想记点什么？比如：刚散完步、在公司测的" maxlength="200"></textarea>
 
     <div class="when"><label for="in-time">测量时间</label><input type="datetime-local" id="in-time"></div>
     <p class="err" id="err" role="alert"></p>
@@ -378,6 +414,118 @@ textarea:focus{outline:none;border-color:var(--heart)}
 <div class="toast" id="toast" hidden></div>
 
 <script>
+/* 小周血压本 · 生成带颜色的 Excel（.xlsx），不用外部库 */
+var BPXLSX = (function(){
+  var CRC=(function(){ var t=new Uint32Array(256); for (var n=0;n<256;n++){ var c=n; for (var k=0;k<8;k++) c = c&1 ? 0xEDB88320^(c>>>1) : c>>>1; t[n]=c>>>0; } return t; })();
+  function crc32(u8){ var c=0xFFFFFFFF; for (var i=0;i<u8.length;i++) c=CRC[(c^u8[i])&255]^(c>>>8); return (c^0xFFFFFFFF)>>>0; }
+  var enc=new TextEncoder();
+  function zip(files){
+    var parts=[], central=[], off=0, d=new Date();
+    var dosTime=(d.getHours()<<11)|(d.getMinutes()<<5)|(d.getSeconds()>>1);
+    var dosDate=((d.getFullYear()-1980)<<9)|((d.getMonth()+1)<<5)|d.getDate();
+    files.forEach(function(f){
+      var name=enc.encode(f.name), data=typeof f.data==="string" ? enc.encode(f.data) : f.data, crc=crc32(data);
+      var h=new DataView(new ArrayBuffer(30));
+      h.setUint32(0,0x04034b50,true); h.setUint16(4,20,true); h.setUint16(6,0x0800,true); h.setUint16(8,0,true);
+      h.setUint16(10,dosTime,true); h.setUint16(12,dosDate,true); h.setUint32(14,crc,true);
+      h.setUint32(18,data.length,true); h.setUint32(22,data.length,true); h.setUint16(26,name.length,true); h.setUint16(28,0,true);
+      parts.push(new Uint8Array(h.buffer), name, data);
+      var c=new DataView(new ArrayBuffer(46));
+      c.setUint32(0,0x02014b50,true); c.setUint16(4,20,true); c.setUint16(6,20,true); c.setUint16(8,0x0800,true); c.setUint16(10,0,true);
+      c.setUint16(12,dosTime,true); c.setUint16(14,dosDate,true); c.setUint32(16,crc,true);
+      c.setUint32(20,data.length,true); c.setUint32(24,data.length,true); c.setUint16(28,name.length,true);
+      c.setUint32(42,off,true);
+      central.push(new Uint8Array(c.buffer), name);
+      off+=30+name.length+data.length;
+    });
+    var cdSize=central.reduce(function(a,b){ return a+b.length; },0);
+    var e=new DataView(new ArrayBuffer(22));
+    e.setUint32(0,0x06054b50,true); e.setUint16(8,files.length,true); e.setUint16(10,files.length,true);
+    e.setUint32(12,cdSize,true); e.setUint32(16,off,true);
+    var all=parts.concat(central,[new Uint8Array(e.buffer)]), len=all.reduce(function(a,b){ return a+b.length; },0);
+    var out=new Uint8Array(len), p=0; all.forEach(function(b){ out.set(b,p); p+=b.length; });
+    return out;
+  }
+  function x(s){ return String(s).replace(/[&<>"]/g,function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]; }).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,""); }
+  function colName(i){ var s=""; i++; while (i>0){ var m=(i-1)%26; s=String.fromCharCode(65+m)+s; i=Math.floor((i-1)/26); } return s; }
+
+  // 样式编号
+  var ST = {normal:0, header:1, title:2, high:3, highRow:4, low:5, lowRow:6, note:7};
+  var STYLES = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+    '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'+
+    '<fonts count="6">'+
+      '<font><sz val="11"/><name val="Microsoft YaHei"/></font>'+
+      '<font><b/><sz val="11"/><name val="Microsoft YaHei"/></font>'+
+      '<font><b/><sz val="14"/><color rgb="FFE5485F"/><name val="Microsoft YaHei"/></font>'+
+      '<font><b/><sz val="11"/><color rgb="FFD11F1F"/><name val="Microsoft YaHei"/></font>'+
+      '<font><b/><sz val="11"/><color rgb="FF2F5FB8"/><name val="Microsoft YaHei"/></font>'+
+      '<font><sz val="10"/><color rgb="FF76666F"/><name val="Microsoft YaHei"/></font>'+
+    '</fonts>'+
+    '<fills count="5">'+
+      '<fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>'+
+      '<fill><patternFill patternType="solid"><fgColor rgb="FFFCE3E7"/><bgColor indexed="64"/></patternFill></fill>'+
+      '<fill><patternFill patternType="solid"><fgColor rgb="FFFDE0DE"/><bgColor indexed="64"/></patternFill></fill>'+
+      '<fill><patternFill patternType="solid"><fgColor rgb="FFE1EAF8"/><bgColor indexed="64"/></patternFill></fill>'+
+    '</fills>'+
+    '<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border>'+
+      '<border><left style="thin"><color rgb="FFEADDE1"/></left><right style="thin"><color rgb="FFEADDE1"/></right><top style="thin"><color rgb="FFEADDE1"/></top><bottom style="thin"><color rgb="FFEADDE1"/></bottom><diagonal/></border></borders>'+
+    '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'+
+    '<cellXfs count="8">'+
+      '<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1"><alignment vertical="center" wrapText="1"/></xf>'+
+      '<xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>'+
+      '<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/>'+
+      '<xf numFmtId="0" fontId="3" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"><alignment horizontal="center" vertical="center"/></xf>'+
+      '<xf numFmtId="0" fontId="0" fillId="3" borderId="1" xfId="0" applyFill="1" applyBorder="1"><alignment vertical="center" wrapText="1"/></xf>'+
+      '<xf numFmtId="0" fontId="4" fillId="4" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"><alignment horizontal="center" vertical="center"/></xf>'+
+      '<xf numFmtId="0" fontId="0" fillId="4" borderId="1" xfId="0" applyFill="1" applyBorder="1"><alignment vertical="center" wrapText="1"/></xf>'+
+      '<xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1"/>'+
+    '</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+
+  /* opts: {sheet, title, headers:[...], widths:[...], rows:[{cells:[...], level:"high"|"low"|"", hot:[列号...]}], foot} */
+  function build(opts){
+    var rx=[], r=1, ncol=opts.headers.length, lastCol=colName(ncol-1);
+    function cell(ref, v, st){
+      if (v===null || v===undefined || v==="") return '<c r="'+ref+'" s="'+st+'"/>';
+      if (typeof v==="number") return '<c r="'+ref+'" s="'+st+'"><v>'+v+'</v></c>';
+      return '<c r="'+ref+'" s="'+st+'" t="inlineStr"><is><t xml:space="preserve">'+x(v)+'</t></is></c>';
+    }
+    rx.push('<row r="'+r+'" ht="24" customHeight="1">'+cell("A"+r, opts.title, ST.title)+'</row>'); r++;
+    rx.push('<row r="'+r+'" ht="22" customHeight="1">'+opts.headers.map(function(h,i){ return cell(colName(i)+r, h, ST.header); }).join("")+'</row>');
+    var headRow=r; r++;
+    opts.rows.forEach(function(row){
+      var cs=row.cells.map(function(v,i){
+        var st=ST.normal;
+        if (row.level==="high") st = row.hot.indexOf(i)>=0 ? ST.high : ST.highRow;
+        else if (row.level==="low") st = row.hot.indexOf(i)>=0 ? ST.low : ST.lowRow;
+        return cell(colName(i)+r, v, st);
+      });
+      rx.push('<row r="'+r+'">'+cs.join("")+'</row>'); r++;
+    });
+    if (opts.foot){ r++; rx.push('<row r="'+r+'">'+cell("A"+r, opts.foot, ST.note)+'</row>'); }
+    var cols='<cols>'+opts.widths.map(function(w,i){ return '<col min="'+(i+1)+'" max="'+(i+1)+'" width="'+w+'" customWidth="1"/>'; }).join("")+'</cols>';
+    var sheet='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+      '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'+
+      '<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><sheetViews><sheetView workbookViewId="0"><pane ySplit="'+headRow+'" topLeftCell="A'+(headRow+1)+'" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>'+
+      '<sheetFormatPr defaultRowHeight="18"/>'+cols+'<sheetData>'+rx.join("")+'</sheetData>'+
+      '<autoFilter ref="A'+headRow+':'+lastCol+(Math.max(headRow,headRow+opts.rows.length))+'"/>'+
+      '<pageMargins left="0.5" right="0.5" top="0.6" bottom="0.6" header="0.3" footer="0.3"/>'+
+      '<pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="0"/></worksheet>';
+    var sheetName=x(opts.sheet||"血压记录").slice(0,31);
+    var files=[
+      {name:"[Content_Types].xml", data:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>'},
+      {name:"_rels/.rels", data:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'},
+      {name:"xl/workbook.xml", data:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="'+sheetName+'" sheetId="1" r:id="rId1"/></sheets><definedNames><definedName name="_xlnm._FilterDatabase" localSheetId="0" hidden="1">\''+sheetName+'\'!$A$'+headRow+':$'+lastCol+'$'+(Math.max(headRow,headRow+opts.rows.length))+'</definedName></definedNames></workbook>'},
+      {name:"xl/_rels/workbook.xml.rels", data:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>'},
+      {name:"xl/styles.xml", data:STYLES},
+      {name:"xl/worksheets/sheet1.xml", data:sheet}
+    ];
+    return zip(files);
+  }
+  return {build:build};
+})();
+if (typeof module!=="undefined") module.exports=BPXLSX;
+</script>
+<script>
 /* 小周血压本 · 导入以前的记录（Excel / CSV）——只做解析，不碰页面 */
 var BPIMPORT = (function(){
   function S(v){ return v==null ? "" : String(v).replace(/\s+/g," ").trim(); }
@@ -392,6 +540,8 @@ var BPIMPORT = (function(){
     time:  /时间|time|几点|时刻|钟点/i,
     med:   /药|medic|\bmeds?\b|drug|pill/i,
     feel:  /感觉|症状|身体|不舒服/,
+    meal:  /吃饭情况|空腹|饱腹|饱|餐前|餐后|饭前|饭后|meal/i,
+    food:  /饮食|食物|吃了|喝了|吃喝|diet|food|drink/i,
     note:  /备注|note|说明|remark|其他|情况|记事/i,
     bp:    /血压|\bbp\b|blood ?pressure/i,
     period:/时段|早晚|上下午|period/i
@@ -404,6 +554,8 @@ var BPIMPORT = (function(){
     if (RX.date.test(h) && RX.time.test(h)) return "datetime";
     if (RX.date.test(h)) return "date";
     if (RX.time.test(h)) return "time";
+    if (RX.meal.test(h)) return "meal";
+    if (RX.food.test(h)) return "food";
     if (RX.med.test(h)) return "med";
     if (RX.feel.test(h)) return "feel";
     if (RX.note.test(h)) return "note";
@@ -428,7 +580,7 @@ var BPIMPORT = (function(){
     for (c=0;c<n;c++){
       var h=low[c]||"", k=kindOf(h), p=periodOf(h);
       if (!k && up[c] && !periodOf(up[c])) k=kindOf(up[c]);          // 上下合并的“日期”
-      if (!p && upCount>=2 && /^(sys|dia|pulse|bp|time|note|med|feel)$/.test(k)) p=periodOf(upFill[c]);
+      if (!p && upCount>=2 && /^(sys|dia|pulse|bp|time|note|med|feel|food|meal)$/.test(k)) p=periodOf(upFill[c]);
       cols.push({k:k, p:p, h:h});
     }
     return cols;
@@ -495,6 +647,7 @@ var BPIMPORT = (function(){
     if (/已|吃|服|是|^yes$|^y$|√|✓|✔|^1$/i.test(s)) return "taken";
     return null;
   }
+  function mealOf(v){ var s=S(v); if (!s) return null; if (/空腹|饭前|餐前/.test(s)) return "空腹"; if (/半饱/.test(s)) return "半饱"; if (/饱|饭后|餐后/.test(s)) return "饱腹"; return s.slice(0,8); }
   function feelOf(v){ var s=S(v); return s ? s.split(/[、,，;；\/]+/).map(S).filter(Boolean).slice(0,6) : []; }
 
   /* ---------- 一张表 → 记录 ---------- */
@@ -512,7 +665,7 @@ var BPIMPORT = (function(){
     var shared={}, groups={};
     cols.forEach(function(c,idx){
       if (!c.k) return;
-      if (c.p && /^(sys|dia|pulse|bp|time|note|med|feel)$/.test(c.k)){
+      if (c.p && /^(sys|dia|pulse|bp|time|note|med|feel|food|meal)$/.test(c.k)){
         var g=groups[c.p]||(groups[c.p]={}); if (g[c.k]==null) g[c.k]=idx;
       } else if (shared[c.k]==null) shared[c.k]=idx;
     });
@@ -545,9 +698,12 @@ var BPIMPORT = (function(){
         if (!tm && shared.period!=null) tm=parseTime(row[shared.period]);
         if (!tm && G.p) tm=PERIOD_TIME[G.p].slice();
         var mc = c.med!=null ? c.med : shared.med, fc = c.feel!=null ? c.feel : shared.feel, nc = c.note!=null ? c.note : shared.note;
+        var fdc = c.food!=null ? c.food : shared.food, mlc = c.meal!=null ? c.meal : shared.meal;
         out.raw.push({dt:dt, tm:tm, sys:sys, dia:dia, pulse:pulse,
           med: mc!=null ? medOf(row[mc]) : null,
           feel: fc!=null ? feelOf(row[fc]) : [],
+          food: fdc!=null ? feelOf(row[fdc]) : [],
+          meal: mlc!=null ? mealOf(row[mlc]) : null,
           note: nc!=null ? S(row[nc]).slice(0,200) : "", row:r});
         got++;
       });
@@ -611,7 +767,7 @@ var BPIMPORT = (function(){
       var t=new Date(y,m-1,d,hh,mi).getTime();
       if (t>now+864e5){ out.bad++; return; }
       var key=keyOf(t,sys,dia); if (seen[key]){ out.dup++; return; } seen[key]=1;
-      items.push({t:t, sys:sys, dia:dia, pulse:pulse, med:x.med, feel:x.feel||[], note:x.note||"", timeGuessed:guessed});
+      items.push({t:t, sys:sys, dia:dia, pulse:pulse, med:x.med, feel:x.feel||[], food:x.food||[], meal:x.meal||null, note:x.note||"", timeGuessed:guessed});
     });
     items.sort(function(a,b){ return a.t-b.t; });
     out.items=items;
@@ -932,6 +1088,147 @@ var BPOCR = (function(){
     r.ok=!!(sys&&dia) && plausible(r);
     return r;
   }
+
+  /* ---------- 后备：不找屏幕边框，直接找一排排数码管数字（黑底亮字也行） ---------- */
+  function readGeneric(img, deg, inv){
+    var G=toGray(img, 900, deg), W=G.W, H=G.H, g=G.g;
+    if (Math.max(W,H)<600){ G=toGrayScaled(img, 600, deg); W=G.W; H=G.H; g=G.g; }
+    var S=new Float64Array((W+1)*(H+1));
+    for (var y=0;y<H;y++){ var row=0; for (var x=0;x<W;x++){ row+=g[y*W+x]; S[(y+1)*(W+1)+x+1]=S[y*(W+1)+x+1]+row; } }
+    var r=Math.max(8,Math.round(Math.min(W,H)/10)), m=new Uint8Array(W*H);
+    for (y=0;y<H;y++) for (x=0;x<W;x++){
+      var xa=Math.max(0,x-r), xb=Math.min(W,x+r+1), ya=Math.max(0,y-r), yb=Math.min(H,y+r+1);
+      var mean=(S[yb*(W+1)+xb]-S[ya*(W+1)+xb]-S[yb*(W+1)+xa]+S[ya*(W+1)+xa])/((xb-xa)*(yb-ya));
+      var v=g[y*W+x];
+      m[y*W+x] = inv ? (v>mean+18 && v>100 ? 1:0) : (v<mean-14 && v<mean*0.9 ? 1:0);
+    }
+    // 笔画粗细
+    var runs=[];
+    for (y=0;y<H;y+=2){ var c=0; for (x=0;x<=W;x++){ if (x<W && m[y*W+x]) c++; else { if (c>1 && c<80) runs.push(c); c=0; } } }
+    for (x=0;x<W;x+=2){ var c2=0; for (y=0;y<=H;y++){ if (y<H && m[y*W+x]) c2++; else { if (c2>1 && c2<80) runs.push(c2); c2=0; } } }
+    if (runs.length<20) return {ok:false};
+    runs.sort(function(a,b){ return a-b; });
+    var stroke=runs[Math.floor(runs.length*0.4)];
+    // 去掉实心的反光块（笔画周围不会全是亮的）
+    var I=new Int32Array((W+1)*(H+1));
+    for (y=0;y<H;y++){ var rs=0; for (x=0;x<W;x++){ rs+=m[y*W+x]; I[(y+1)*(W+1)+x+1]=I[y*(W+1)+x+1]+rs; } }
+    var rr=Math.max(2,Math.round(stroke*1.6)), solid=new Uint8Array(W*H);
+    for (y=0;y<H;y++) for (x=0;x<W;x++){
+      if (!m[y*W+x]) continue;
+      var xa2=Math.max(0,x-rr), xb2=Math.min(W,x+rr+1), ya2=Math.max(0,y-rr), yb2=Math.min(H,y+rr+1);
+      var dens=(I[yb2*(W+1)+xb2]-I[ya2*(W+1)+xb2]-I[yb2*(W+1)+xa2]+I[ya2*(W+1)+xa2])/((xb2-xa2)*(yb2-ya2));
+      if (dens>0.82) solid[y*W+x]=1;
+    }
+    // 把实心块往外扩一圈一起去掉
+    for (y=0;y<H;y++) for (x=0;x<W;x++){ if (solid[y*W+x]!==1) continue;
+      for (var dy=-rr;dy<=rr;dy+=Math.max(1,rr>>1)) for (var dx=-rr;dx<=rr;dx+=Math.max(1,rr>>1)){ var yy2=y+dy, xx2=x+dx; if (yy2>=0&&yy2<H&&xx2>=0&&xx2<W && solid[yy2*W+xx2]!==1) solid[yy2*W+xx2]=2; } }
+    for (var i=0;i<m.length;i++) if (solid[i]) m[i]=0;
+    // 去掉屏幕边框这种大块，和小噪点
+    var c0=components(m,W,H);
+    var drop={}; c0.comps.forEach(function(c){
+      var w=c.x1-c.x0+1, h=c.y1-c.y0+1;
+      if (h>H*0.33 || w>W*0.33 || c.area<8) drop[c.id]=1;
+    });
+    for (i=0;i<m.length;i++) if (m[i] && drop[c0.lab[i]]) m[i]=0;
+    var rx=Math.max(1,Math.round(stroke*0.35)), ry=Math.max(1,Math.round(stroke*0.5));
+    var tmp=new Uint8Array(W*H), D=new Uint8Array(W*H);
+    for (y=0;y<H;y++){ var last=-1e9; for (x=0;x<W;x++){ if (m[y*W+x]) last=x; if (x-last<=rx) tmp[y*W+x]=1; }
+      last=1e9; for (x=W-1;x>=0;x--){ if (m[y*W+x]) last=x; if (last-x<=rx) tmp[y*W+x]=1; } }
+    for (x=0;x<W;x++){ var ly=-1e9; for (y=0;y<H;y++){ if (tmp[y*W+x]) ly=y; if (y-ly<=ry) D[y*W+x]=1; }
+      ly=1e9; for (y=H-1;y>=0;y--){ if (tmp[y*W+x]) ly=y; if (ly-y<=ry) D[y*W+x]=1; } }
+    // 每块：收紧到原始笔画，再按列切成一位位数字
+    var CC=components(D,W,H), blobs=[];
+    CC.comps.forEach(function(c){
+      var x0=W,x1=-1,y0=H,y1=-1,on=0;
+      for (var yy=c.y0;yy<=c.y1;yy++) for (var xx=c.x0;xx<=c.x1;xx++){ var q=yy*W+xx; if (m[q] && CC.lab[q]===c.id){ on++; if (xx<x0)x0=xx; if (xx>x1)x1=xx; if (yy<y0)y0=yy; if (yy>y1)y1=yy; } }
+      if (x1<0) return;
+      var w=x1-x0+1, h=y1-y0+1;
+      if (h<14 || h>H*0.45) return;
+      if (w/h>3.6) return;
+      var fill=on/(w*h); if (fill<0.08 || fill>0.7) return;
+      blobs.push({x0:x0,x1:x1,y0:y0,y1:y1,h:h,cy:(y0+y1)/2,id:c.id});
+    });
+    function splitDigits(bl){
+      var h=bl.h, col=[];
+      for (var xx=bl.x0;xx<=bl.x1;xx++){ var sum=0; for (var yy=bl.y0;yy<=bl.y1;yy++) sum+=m[yy*W+xx]; col.push(sum); }
+      var parts=[], st=-1;
+      for (var k=0;k<=col.length;k++){ var onc=k<col.length && col[k]>0; if (onc && st<0) st=k; if (!onc && st>=0){ parts.push([st,k-1]); st=-1; } }
+      // 很窄、又不够高的碎片并到旁边（“1”虽然窄，但是有一整位那么高，不并）
+      function vext(pt){ var t=-1,b=-1; for (var yy=bl.y0;yy<=bl.y1;yy++){ for (var xx=bl.x0+pt[0];xx<=bl.x0+pt[1];xx++){ if (m[yy*W+xx]){ if (t<0) t=yy; b=yy; break; } } } return t<0?0:b-t+1; }
+      function frag(pt){ return pt[1]-pt[0]+1 < h*0.12 && vext(pt) < h*0.6; }
+      var merged=[];
+      parts.forEach(function(pt){
+        var l=merged[merged.length-1];
+        if (l && pt[0]-l[1]-1 <= Math.max(1,stroke*0.25) && (frag(pt) || frag(l))) l[1]=pt[1]; else merged.push(pt.slice());
+      });
+      // 太宽的（几位粘在一起）从最细的地方切开
+      var out=[];
+      (function cut(list){
+        list.forEach(function(pt){
+          var w=pt[1]-pt[0]+1;
+          if (w>h*0.85){
+            var lo=pt[0]+Math.round(h*0.25), hi=pt[1]-Math.round(h*0.25), bi=-1, bv=1e9;
+            for (var k=lo;k<=hi;k++){ if (col[k]<bv){ bv=col[k]; bi=k; } }
+            if (bi>pt[0] && bi<pt[1]) return cut([[pt[0],bi-1],[bi+1,pt[1]]]);
+          }
+          out.push(pt);
+        });
+      })(merged);
+      return out.map(function(pt){
+        var dx0=bl.x0+pt[0], dx1=bl.x0+pt[1], ty=bl.y1, by=bl.y0;
+        for (var yy=bl.y0;yy<=bl.y1;yy++) for (var xx=dx0;xx<=dx1;xx++) if (m[yy*W+xx]){ if (yy<ty) ty=yy; if (yy>by) by=yy; }
+        return {x0:dx0,x1:dx1,y0:ty,y1:by};
+      }).filter(function(d){ return d.y1-d.y0+1>=h*0.6; });
+    }
+    // 按行分组
+    blobs.sort(function(a,b){ return a.cy-b.cy; });
+    var rows=[];
+    blobs.forEach(function(b){
+      var hit=null;
+      rows.forEach(function(rw){
+        var ov=Math.min(rw.y1,b.y1)-Math.max(rw.y0,b.y0), ratio=b.h/rw.h;
+        if (!hit && ov>0.6*Math.min(rw.h,b.h) && ratio>0.7 && ratio<1.4) hit=rw;
+      });
+      if (hit){ hit.b.push(b); hit.y0=Math.min(hit.y0,b.y0); hit.y1=Math.max(hit.y1,b.y1); hit.h=Math.max(hit.h,b.h); }
+      else rows.push({b:[b], y0:b.y0, y1:b.y1, h:b.h});
+    });
+    rows=rows.map(function(rw){
+      rw.b.sort(function(a,b){ return a.x0-b.x0; });
+      var groups=[[rw.b[0]]];
+      for (var i=1;i<rw.b.length;i++){ var gp=groups[groups.length-1], prev=gp[gp.length-1];
+        if (rw.b[i].x0-prev.x1 < rw.h*0.9) gp.push(rw.b[i]); else groups.push([rw.b[i]]); }
+      var cands=groups.map(function(gp){ var ds=[]; gp.forEach(function(bl){ ds=ds.concat(splitDigits(bl)); }); return ds; })
+        .filter(function(ds){ return ds.length>=2 && ds.length<=3; });
+      if (!cands.length) return null;
+      cands.sort(function(a,b){ return (b[b.length-1].x1-b[0].x0)-(a[a.length-1].x1-a[0].x0); });
+      var ds=cands[0], hs=ds.map(function(d){ return d.y1-d.y0+1; }).sort(function(a,b){ return a-b; });
+      return {d:ds, h:hs[hs.length>>1], y:(rw.y0+rw.y1)/2};
+    }).filter(Boolean);
+    if (readGeneric.debug) readGeneric.last={W:W,H:H,stroke:stroke,blobs:blobs.length,rows:rows.map(function(rw){return {n:rw.d.length,h:rw.h,y:Math.round(rw.y),xs:rw.d.map(function(b){return [b.x0,b.x1,b.y0,b.y1];})};}),mask:Array.prototype.join.call(m,'')};
+    if (!rows.length) return {ok:false};
+    // 血压数字几行是上下对齐的：以最高的一行为准，只留和它左右有重叠的行
+    rows.forEach(function(rw){ rw.x0=rw.d[0].x0; rw.x1=rw.d[rw.d.length-1].x1; });
+    var top=rows.slice().sort(function(a,b){ return b.h-a.h; })[0];
+    var maxH=top.h;
+    var big=rows.filter(function(rw){
+      var ov=Math.min(rw.x1,top.x1)-Math.max(rw.x0,top.x0);
+      return rw.h>=maxH*0.55 && ov>0.3*Math.min(rw.x1-rw.x0, top.x1-top.x0);
+    }).sort(function(a,b){ return a.y-b.y; }).slice(0,3);
+    if (big.length<2) return {ok:false};
+    var M={m:m, w:W, h:H};
+    var nums=big.map(function(rw){ return rw.d.map(function(d){ return readDigit(M,d,rw.h); }).join(""); });
+    var sys=/^\d{2,3}$/.test(nums[0])?+nums[0]:null, dia=/^\d{2,3}$/.test(nums[1])?+nums[1]:null, pulse=/^\d{2,3}$/.test(nums[2]||"")?+nums[2]:null;
+    var res={sys:sys, dia:dia, pulse:pulse, raw:nums, deg:deg, inv:inv};
+    res.ok=!!(sys&&dia) && plausible(res);
+    return res;
+  }
+  function toGrayScaled(img, minSide, deg){
+    // 小图先放大一点再处理
+    var w=img.width, h=img.height, sc=minSide/Math.max(w,h);
+    var cv=document.createElement("canvas"); cv.width=Math.round(w*sc); cv.height=Math.round(h*sc);
+    var cx=cv.getContext("2d"); cx.imageSmoothingQuality="high"; cx.drawImage(img,0,0,cv.width,cv.height);
+    return toGray(cv, minSide, deg);
+  }
   // 拍歪了也能读：先试正的，再左右各转几度，挑第一个合理的结果（有脉搏的优先）
   function read(img){
     var half=null, last=null, angles=[0,-4,4,-8,8,-12,12];
@@ -940,7 +1237,15 @@ var BPOCR = (function(){
       if (r.ok && r.pulse!=null) return finish(r);
       if (r.ok && !half) half=r;
     }
-    return finish(half || {ok:false, reason:(last&&last.reason)||"屏幕上的数字没看清"});
+    if (half) return finish(half);
+    // 找不到白底屏幕：换成直接找数字的办法，黑底亮字、白底黑字都试
+    var gHalf=null, gAngles=[0,-4,4,-8,8];
+    for (var a=0;a<gAngles.length;a++) for (var k=0;k<2;k++){
+      var g=readGeneric(img, gAngles[a], k===0);
+      if (g.ok && g.pulse!=null) return finish(g);
+      if (g.ok && !gHalf) gHalf=g;
+    }
+    return finish(gHalf || {ok:false, reason:(last&&last.reason)||"屏幕上的数字没看清"});
   }
   function finish(r){
     var M=r.M, rows=r.rows;
@@ -954,7 +1259,7 @@ var BPOCR = (function(){
     }
     return res;
   }
-  return {read:read};
+  return {read:read, _gen:readGeneric};
 })();
 </script>
 <script>
@@ -1138,6 +1443,8 @@ var BPOCR = (function(){
     if (r.pulse) sub.push('<span>心率 <span class="num">'+r.pulse+'</span></span>');
     if (r.med && r.med!=="none") sub.push('<span class="tag'+(r.med==="taken"?" med":"")+'">'+medText(r.med)+'</span>');
     (r.feel||[]).forEach(function(f){ sub.push('<span class="tag">'+esc(f)+'</span>'); });
+    (r.food||[]).forEach(function(f){ sub.push('<span class="tag food">'+esc(f)+'</span>'); });
+    if (r.meal) sub.push('<span class="tag">'+esc(r.meal)+'</span>');
     if (r.note) sub.push('<span class="note">'+esc(r.note)+'</span>');
     var actions = open ? '<div class="row-actions">'+
       (confirmDel===r.id
@@ -1156,7 +1463,7 @@ var BPOCR = (function(){
     if (mode==="loading"){ el.innerHTML='<span class="label">最近一次</span><span class="empty">正在读取记录…</span>'; return; }
     var s=sorted();
     if (!s.length){
-      el.innerHTML='<span class="label">最近一次</span><span class="empty">还没有记录。测好血压后，点下面的“记一次血压”，把血压计上的两个数字填进去就好。</span>';
+      el.innerHTML='<span class="label">最近一次</span><span class="empty">还没有记录。测好血压后，点下面的“拍一下血压计”拍张照，或者点“自己输入数字”把两个数字填进去就好。</span>';
       return;
     }
     var r=s[0], c=CAT[classify(r.sys,r.dia)];
@@ -1281,11 +1588,12 @@ var BPOCR = (function(){
   }
 
   /* ---------- 表单 ---------- */
-  var med=null;
+  var med=null, meal=null;
   function openForm(opts){
     opts = opts || {};
     $("form").reset(); med=null; $("err").textContent="";
-    document.querySelectorAll("#med-chips .chip,#feel-chips .chip").forEach(function(c){ c.setAttribute("aria-pressed","false"); });
+    document.querySelectorAll("#med-chips .chip,#feel-chips .chip,#food-chips .chip,#meal-chips .chip").forEach(function(c){ c.setAttribute("aria-pressed","false"); });
+    meal=null;
     document.querySelectorAll(".field").forEach(function(f){ f.classList.remove("filled"); });
     $("in-time").value = localInputValue(Date.now());
     $("scan-box").hidden = !opts.scan;
@@ -1397,6 +1705,16 @@ var BPOCR = (function(){
     var b=e.target.closest(".chip"); if(!b) return;
     b.setAttribute("aria-pressed", b.getAttribute("aria-pressed")==="true"?"false":"true");
   });
+  $("food-chips").addEventListener("click", function(e){
+    var b=e.target.closest(".chip"); if(!b) return;
+    b.setAttribute("aria-pressed", b.getAttribute("aria-pressed")==="true"?"false":"true");
+  });
+  $("meal-chips").addEventListener("click", function(e){
+    var b=e.target.closest(".chip"); if(!b) return;
+    var on=b.getAttribute("aria-pressed")!=="true";
+    document.querySelectorAll("#meal-chips .chip").forEach(function(c){ c.setAttribute("aria-pressed","false"); });
+    b.setAttribute("aria-pressed", on?"true":"false"); meal = on ? b.dataset.meal : null;
+  });
   var saving=false;
   $("form").addEventListener("submit", function(e){
     e.preventDefault(); if (saving) return;
@@ -1410,13 +1728,20 @@ var BPOCR = (function(){
     var t = $("in-time").value ? new Date($("in-time").value).getTime() : Date.now();
     if (isNaN(t)) t=Date.now();
     var feel=[]; document.querySelectorAll("#feel-chips .chip[aria-pressed='true']").forEach(function(c){ feel.push(c.textContent); });
-    var r={ id:"r"+Date.now().toString(36)+Math.random().toString(36).slice(2,6), t:t, sys:s, dia:d, pulse:p, med:med, feel:feel, note:$("in-note").value.trim().slice(0,200) };
+    var food=[]; document.querySelectorAll("#food-chips .chip[aria-pressed='true']").forEach(function(c){ food.push(c.textContent); });
+    var r={ id:"r"+Date.now().toString(36)+Math.random().toString(36).slice(2,6), t:t, sys:s, dia:d, pulse:p, med:med, feel:feel, food:food, meal:meal, note:$("in-note").value.trim().slice(0,200) };
     saving=true; err.textContent="";
     var before=streaks().current;
     addReading(r).then(function(){
       saving=false; closeForm(); showView("home");
       var k=classify(s,d);
-      say(SAY_AFTER[k], k==="ok"?"cheer":k==="elev"?"point":"hug");
+      var extra="";
+      if (k==="elev"||k==="high"){
+        var drink=food.filter(function(f){ return /咖啡|茶/.test(f); });
+        if (drink.length) extra+="刚"+drink.join("、").replace(/喝了/g,"喝")+"，血压会暂时高一点，下次最好过 30 分钟再测。";
+        if (food.indexOf("吃了重油重盐")>=0) extra+="今天吃得咸，接下来清淡一点哦。";
+      }
+      say(SAY_AFTER[k]+(extra?" "+extra:""), k==="ok"?"cheer":k==="elev"?"point":"hug");
       var list=readings.some(function(x){ return x.id===r.id; }) ? readings : readings.concat([r]);
       var after=streaks(list).current, hit=null;
       MILESTONES.forEach(function(m){ if (before<m.n && after>=m.n) hit=m; });
@@ -1467,30 +1792,54 @@ var BPOCR = (function(){
   /* ---------- 导出 / 复制 ---------- */
   function fullDate(t){ var d=new Date(t); return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate()); }
   function csvCell(v){ v=String(v==null?"":v); return /[",\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; }
-  $("export-csv").addEventListener("click", function(){
-    if (!dl && !STANDALONE) return;
-    var s=sorted(); if (!s.length){ toast("还没有记录可以导出"); return; }
-    var lines=["日期,时间,高压(mmHg),低压(mmHg),心率(次/分),判断,降压药,身体感觉,备注"];
-    s.forEach(function(r){ lines.push([fullDate(r.t),hm(r.t),r.sys,r.dia,r.pulse||"",CAT[classify(r.sys,r.dia)].label,medText(r.med),(r.feel||[]).join("、"),r.note||""].map(csvCell).join(",")); });
-    var fname="血压记录_"+fullDate(Date.now())+".csv", body="﻿"+lines.join("\r\n");
+  function saveFile(fname, data, mime){
     if (!dl){
       try{
-        var url=URL.createObjectURL(new Blob([body],{type:"text/csv;charset=utf-8"}));
+        var url=URL.createObjectURL(new Blob([data],{type:mime}));
         var a=document.createElement("a"); a.href=url; a.download=fname; document.body.appendChild(a); a.click(); a.remove();
         setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
         toast("表格已下载，在手机的“下载”里能找到");
       }catch(e){ toast("下载不了，可以用“复制文字”"); }
       return;
     }
-    dl.save({filename:fname, data:body})
+    dl.save({filename:fname, data:data})
       .then(function(){ toast("表格已保存"); })
       .catch(function(e){ if (e && e.code!=="declined") toast("这里存不了文件，可以用“复制文字”"); });
-  });
+  }
+  function exportXlsx(onlyBad){
+    if (!dl && !STANDALONE) return;
+    var s=sorted();
+    if (onlyBad) s=s.filter(function(r){ var k=classify(r.sys,r.dia); return k==="high"||k==="crit"||k==="low"; });
+    if (!s.length){ toast(onlyBad ? "没有偏高或偏低的记录，妈咪很棒！" : "还没有记录可以导出"); return; }
+    var hi=0, lo=0;
+    var rows=s.map(function(r){
+      var k=classify(r.sys,r.dia), level = (k==="high"||k==="crit") ? "high" : k==="low" ? "low" : "";
+      if (level==="high") hi++; if (level==="low") lo++;
+      // 标出到底是哪一个数超了
+      var hot=[5];
+      if (level==="high"){ if (r.sys>=135) hot.push(2); if (r.dia>=85) hot.push(3); }
+      if (level==="low"){ if (r.sys<90) hot.push(2); if (r.dia<60) hot.push(3); }
+      return {level:level, hot:hot, cells:[fullDate(r.t), hm(r.t), r.sys, r.dia, r.pulse||"", CAT[k].label, medText(r.med), (r.feel||[]).join("、"), (r.food||[]).join("、"), r.meal||"", r.note||""]};
+    });
+    var first=s[s.length-1].t, last=s[0].t;
+    var title=(onlyBad ? "小周血压本 · 异常记录" : "小周血压本 · 血压记录")+"（"+fullDate(first)+" 至 "+fullDate(last)+"，共 "+s.length+" 次"+(onlyBad ? "：偏高 "+hi+" 次，偏低 "+lo+" 次" : "，其中偏高 "+hi+" 次，偏低 "+lo+" 次")+"）";
+    var bytes=BPXLSX.build({
+      sheet: onlyBad ? "异常记录" : "血压记录",
+      title: title,
+      headers:["日期","时间","高压(mmHg)","低压(mmHg)","心率(次/分)","判断","降压药","身体感觉","饮食","吃饭情况","备注"],
+      widths:[12,8,12,12,12,10,10,16,22,10,26],
+      rows: rows,
+      foot:"说明：红色＝偏高（高压≥135 或 低压≥85）或很高（≥180/110）；蓝色＝偏低（高压<90 或 低压<60）。按家庭自测常用标准，仅供参考，请以医生意见为准。导出于 "+fullDate(Date.now())+"。"
+    });
+    saveFile((onlyBad ? "血压异常记录_" : "血压记录_")+fullDate(Date.now())+".xlsx", bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  }
+  $("export-csv").addEventListener("click", function(){ exportXlsx(false); });
+  $("export-bad").addEventListener("click", function(){ exportXlsx(true); });
   $("copy-text").addEventListener("click", function(){
     var data=inRange().slice().reverse();
     if (!data.length){ toast("这段时间还没有记录"); return; }
     var txt="血压记录（近"+range+"天，共"+data.length+"次）\n";
-    data.forEach(function(r){ txt+=fullDate(r.t).slice(5)+" "+hm(r.t)+"  "+r.sys+"/"+r.dia+(r.pulse?"  心率"+r.pulse:"")+(r.med&&r.med!=="none"?"  "+medText(r.med):"")+((r.feel&&r.feel.length)?"  "+r.feel.join("、"):"")+(r.note?"  "+r.note:"")+"\n"; });
+    data.forEach(function(r){ var kk=classify(r.sys,r.dia); txt+=(kk==="high"||kk==="crit"||kk==="low" ? "❗" : "")+fullDate(r.t).slice(5)+" "+hm(r.t)+"  "+r.sys+"/"+r.dia+(kk==="high"||kk==="crit"||kk==="low" ? "（"+CAT[kk].label+"）" : "")+(r.pulse?"  心率"+r.pulse:"")+(r.med&&r.med!=="none"?"  "+medText(r.med):"")+((r.feel&&r.feel.length)?"  "+r.feel.join("、"):"")+((r.food&&r.food.length)?"  "+r.food.join("、"):"")+(r.meal?"  "+r.meal:"")+(r.note?"  "+r.note:"")+"\n"; });
     var fb=$("copy-fallback");
     function fallback(){ fb.hidden=false; fb.value=txt; fb.focus(); fb.select(); toast("长按上面的文字，选“全选”再复制"); }
     try{
@@ -1556,7 +1905,7 @@ var BPOCR = (function(){
   $("imp-go").addEventListener("click", function(){
     if (!imp || !imp.items.length || impBusy) return;
     var list=imp.items.map(function(x){
-      return {id:"r"+x.t.toString(36)+Math.random().toString(36).slice(2,7), t:x.t, sys:x.sys, dia:x.dia, pulse:x.pulse, med:x.med||null, feel:x.feel||[], note:x.note||""};
+      return {id:"r"+x.t.toString(36)+Math.random().toString(36).slice(2,7), t:x.t, sys:x.sys, dia:x.dia, pulse:x.pulse, med:x.med||null, feel:x.feel||[], food:x.food||[], meal:x.meal||null, note:x.note||""};
     });
     var go=$("imp-go"), n=list.length;
     function done(ok){
@@ -1603,20 +1952,52 @@ var BPOCR = (function(){
   var toastTimer=null;
   function toast(msg){ var t=$("toast"); t.textContent=msg; t.hidden=false; clearTimeout(toastTimer); toastTimer=setTimeout(function(){ t.hidden=true; }, 2600); }
 
+  /* ---------- 装成手机 App（PWA） ---------- */
+  var installEvt=null;
+  var IS_APP_HOST = !HAS_CLAUDE && (location.protocol==="https:" || location.hostname==="localhost");
+  function isStandalone(){ return (window.matchMedia && matchMedia("(display-mode: standalone)").matches) || navigator.standalone===true; }
+  var IS_IOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform==="MacIntel" && navigator.maxTouchPoints>1);
+  function installDismissed(){ try{ var t=+localStorage.getItem("xz-install-x")||0; return Date.now()-t < 14*864e5; }catch(e){ return false; } }
+  function showInstall(){
+    if (!IS_APP_HOST || isStandalone() || installDismissed()) return;
+    $("install-ico").src="icon-192.png";
+    $("install-card").hidden=false;
+    if (!installEvt){
+      $("install-sub").textContent = IS_IOS
+        ? "点 Safari 下面的「分享」按钮，再选「添加到主屏幕」，桌面上就有心心的图标啦。"
+        : "点浏览器右上角「⋮」，选「安装应用」或「添加到主屏幕」。在 WhatsApp 里打开的话，先选「在 Chrome 中打开」。";
+      $("install-btn").hidden=true;
+    } else { $("install-btn").hidden=false; }
+  }
+  window.addEventListener("beforeinstallprompt", function(e){ e.preventDefault(); installEvt=e; showInstall(); });
+  window.addEventListener("appinstalled", function(){ installEvt=null; $("install-card").hidden=true; toast("装好啦，去桌面找心心～"); });
+  $("install-btn").addEventListener("click", function(){
+    if (!installEvt) return;
+    installEvt.prompt();
+    installEvt.userChoice.then(function(c){ if (c && c.outcome==="accepted") $("install-card").hidden=true; installEvt=null; showInstall(); }, function(){});
+  });
+  $("install-x").addEventListener("click", function(){ $("install-card").hidden=true; try{ localStorage.setItem("xz-install-x", String(Date.now())); }catch(e){} });
+  if (IS_APP_HOST){
+    if ("serviceWorker" in navigator){ try{ navigator.serviceWorker.register("sw.js").catch(function(){}); }catch(e){} }
+    if (navigator.storage && navigator.storage.persist){ try{ navigator.storage.persist().catch(function(){}); }catch(e){} }
+    // 安卓 Chrome 会发 beforeinstallprompt；等一会儿没等到（苹果手机、WhatsApp 内置浏览器）就显示手动步骤
+    setTimeout(showInstall, IS_IOS ? 800 : 4000);
+  }
+
   /* ---------- 启动 ---------- */
   renderAllViews(); defaultSay();
   if (HAS_CLAUDE && WEB_EDITION){
     useLocal();
-    $("export-csv").hidden=false; $("restore-btn").hidden=false;
+    $("export-csv").hidden=false; $("export-bad").hidden=false; $("restore-btn").hidden=false;
     window.claude.use("downloads").then(function(ns){ if (ns) dl=ns; }, function(){});
   } else if (HAS_CLAUDE){
     window.claude.use("db").then(function(ns){ if (ns){ db=ns; startDb(); } else useLocal(); }, useLocal);
     window.claude.use("sample").then(enableScan, function(){});
-    window.claude.use("downloads").then(function(ns){ if (ns){ dl=ns; $("export-csv").hidden=false; } }, function(){});
+    window.claude.use("downloads").then(function(ns){ if (ns){ dl=ns; $("export-csv").hidden=false; $("export-bad").hidden=false; } }, function(){});
     setTimeout(function(){ if (mode==="loading") useLocal(); }, 11000);
   } else {
     useLocal();
-    $("export-csv").hidden=false; $("restore-btn").hidden=false;
+    $("export-csv").hidden=false; $("export-bad").hidden=false; $("restore-btn").hidden=false;
   }
   setInterval(function(){ if (mode!=="loading") { renderLatest(); renderToday(); } }, 60000);
 })();
