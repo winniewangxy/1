@@ -1,5 +1,5 @@
 /* 小周血压本 · 离线缓存。页面先联网拿最新版，没网时用缓存。 */
-var CACHE = "xiaozhou-v2";
+var CACHE = "xiaozhou-v3";
 var CORE = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", function (e) {
@@ -16,7 +16,8 @@ self.addEventListener("fetch", function (e) {
   var url = new URL(req.url);
   // 页面本身：先联网（拿到更新），失败再用缓存
   if (req.mode === "navigate" || (url.origin === location.origin && /\/(index\.html)?$/.test(url.pathname))) {
-    e.respondWith(fetch(req).then(function (res) {
+    // 跳过手机的网页缓存，每次都去拿最新版（没网才用离线的那份）
+    e.respondWith(fetch(url.href, { cache: "no-cache", credentials: "same-origin" }).then(function (res) {
       var copy = res.clone(); caches.open(CACHE).then(function (c) { c.put("./index.html", copy); });
       return res;
     }).catch(function () { return caches.match("./index.html").then(function (r) { return r || caches.match("./"); }); }));
