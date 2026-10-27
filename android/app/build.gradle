@@ -1,0 +1,38 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.winnie.xiaozhou'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.winnie.xiaozhou"
+        minSdk 29          // 安卓 10 及以上（华为 P40 可以）
+        targetSdk 34
+        // 每次在 GitHub 上重新打包，版本号自动 +1，这样新 APK 能直接覆盖安装
+        versionCode((System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInteger())
+        versionName "1.0." + (System.getenv("GITHUB_RUN_NUMBER") ?: "0")
+    }
+
+    signingConfigs {
+        release {
+            storeFile file("xiaozhou.jks")
+            storePassword "xiaozhou-bp-2026"
+            keyAlias "xiaozhou"
+            keyPassword "xiaozhou-bp-2026"
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
