@@ -1531,7 +1531,8 @@ var BPOCR = (function(){
 
   /* ---------- 心心说话 ---------- */
   function greeting(){
-    var h=new Date().getHours();
+    var h=new Date().getHours(), bd=new Date();
+    if (bd.getMonth()===9 && bd.getDate()===15) return "妈咪生日快乐！🎂 ";
     if (h>=5 && h<11) return "妈咪早上好！";
     if (h>=11 && h<14) return "妈咪中午好！";
     if (h>=14 && h<18) return "妈咪下午好！";
@@ -1589,13 +1590,11 @@ var BPOCR = (function(){
       {t:"妈咪笑一个嘛，笑起来最好看啦！", p:"happy"},
       {t:"猜猜我在哪？我在盒子里等妈咪呀！", p:"peek"},
       {t:"妈咪有没有想我呀？", p:"ask"},
-      {t:"小周最喜欢妈咪啦，比心～", p:"hug2", fx:"♥"},
+      {t:"心心最喜欢妈咪啦，比心～", p:"hug2", fx:"♥"},
       {t:"妈咪记得多喝水，我陪妈咪一起喝！", p:"tea"}
     ];
-    if (wd===5) L.push({t:"妈咪今天是周五，明天就放假啦，加油！", p:"cheer", fx:"✦", w:3});
-    if (wd===1) L.push({t:"周一啦，新的一周妈咪也要开开心心的！", p:"cheer", w:2});
-    if (wd===0||wd===6) L.push({t:"周末啦！妈咪好好休息，出去走走、晒晒太阳～", p:"lazy", w:2},
-                                {t:"今天放假，妈咪多睡一会儿也没关系哦～", p:"lie2"});
+    WEEKDAY_TALK[wd].forEach(function(m){ L.push({t:m.t, p:m.p, fx:m.fx, w:3, day:1}); });
+    dateTalk(d).forEach(function(m){ L.push({t:m.t, p:m.p, fx:m.fx||"♥", w:5, day:1}); });
     if (work && h>=8 && h<19) L.push({t:"妈咪上班辛苦啦！累了就站起来走一走～", p:"work", w:3},
                                      {t:"上班别忘了喝水，也别一直坐着哦！", p:"tea"});
     if (work && h>=17 && h<21) L.push({t:"妈咪下班辛苦啦！回家好好休息～", p:"rest", w:2});
@@ -1604,6 +1603,50 @@ var BPOCR = (function(){
     if (h>=21 || h<5) L.push({t:"妈咪早点睡，晚安～ 做个好梦！", p:"sleep", w:3});
     TIPS.forEach(function(t,i){ L.push({t:"小贴士："+t, p:TIP_POSES[i%TIP_POSES.length], tip:1}); });
     return L;
+  }
+  // 每天都不一样：周一到周日各有几句
+  var WEEKDAY_TALK = [
+    [ {t:"周日啦，妈咪好好休息，明天又是新的一周～", p:"lie2"},
+      {t:"周日晚上早点睡，明天上班才有精神哦！", p:"sleep"},
+      {t:"周日啦，给自己做一顿清淡又好吃的吧～", p:"tea"} ],
+    [ {t:"周一啦，新的一周妈咪也要开开心心的！", p:"cheer", fx:"✦"},
+      {t:"周一上班最累了，心心给妈咪打气！加油加油！", p:"work"},
+      {t:"新的一周，心心陪妈咪一起好好记血压！", p:"hug2", fx:"♥"} ],
+    [ {t:"周二啦，最难熬的周一已经过去咯！", p:"happy"},
+      {t:"周二也要元气满满，妈咪加油！", p:"peace"},
+      {t:"今天周二，午饭记得少吃点咸的哦～", p:"tea"} ],
+    [ {t:"周三啦，这周已经过一半咯！", p:"cheer", fx:"✦"},
+      {t:"周三是一周的半山腰，再坚持一下下就到周末啦！", p:"focus"},
+      {t:"周三啦，晚上早点休息，养足精神～", p:"rest"} ],
+    [ {t:"周四啦，明天就是周五咯！", p:"happy"},
+      {t:"再坚持两天就放假啦，妈咪最棒！", p:"heart", fx:"♥"},
+      {t:"周四啦，下班可以出去散散步～", p:"wait"} ],
+    [ {t:"妈咪今天是周五，明天就放假啦，加油！", p:"cheer", fx:"✦"},
+      {t:"周五啦！这周妈咪辛苦啦，周末好好休息！", p:"cuddle", fx:"♥"},
+      {t:"周五晚上可以好好放松一下啦～", p:"tea"} ],
+    [ {t:"周六啦！妈咪睡个懒觉吧～", p:"lazy"},
+      {t:"周末啦！出去走走、晒晒太阳～", p:"peace"},
+      {t:"周六出去玩也别忘了测血压哦！", p:"peek"} ]
+  ];
+  // 特别的日子
+  function dateTalk(d){
+    var m=d.getMonth()+1, day=d.getDate(), out=[];
+    if (day===1) out.push({t:"新的一个月开始啦，妈咪这个月也要健健康康的！", p:"cheer", fx:"✦"});
+    if (m===1 && day===1) out.push({t:"新年快乐！心心祝妈咪新的一年身体健康、天天开心！", p:"cheer", fx:"✦"});
+    if (m===3 && day===8) out.push({t:"妇女节快乐！妈咪是心心心里最美的女神！", p:"love"});
+    if (m===5 && day===1) out.push({t:"劳动节快乐！妈咪辛苦啦，放假好好休息～", p:"lazy"});
+    if (m===5 && d.getDay()===0 && day>=8 && day<=14) out.push({t:"母亲节快乐！妈咪我爱你，谢谢妈咪！", p:"love"});
+    if (m===10 && day>=1 && day<=7) out.push({t:"国庆快乐！放假啦，妈咪好好玩，也别忘了测血压哦～", p:"cheer", fx:"✦"});
+    if (m===12 && day===25) out.push({t:"圣诞快乐！心心给妈咪送一个大大的抱抱～", p:"cuddle"});
+    // 妈咪生日 10 月 15 日
+    if (m===10 && day===15){
+      out.push({t:"妈咪生日快乐！心心祝妈咪身体健康、天天开心、越来越年轻！", p:"love"});
+      out.push({t:"今天是妈咪的生日！心心最爱妈咪啦，要吃好吃的哦～", p:"heart"});
+      out.push({t:"生日快乐呀妈咪！给妈咪一个超级大的抱抱～", p:"cuddle"});
+    }
+    if (m===10 && day>=8 && day<=14) out.push({t:"还有 "+(15-day)+" 天就是妈咪的生日啦，心心好期待！", p:"happy"});
+    if (m===12 && day===31) out.push({t:"今天是今年最后一天啦，妈咪这一年辛苦啦！", p:"heart"});
+    return out;
   }
   var talkLast=[], tapCount=0, tapTimer=null;
   function hearts(sym){
@@ -1619,8 +1662,17 @@ var BPOCR = (function(){
   $("xin").addEventListener("click", function(){
     // 一下子点好多下：心心害羞了
     tapCount++; clearTimeout(tapTimer); tapTimer=setTimeout(function(){ tapCount=0; }, 1200);
-    if (tapCount===6){ say("哎呀，妈咪一直点我，是不是很想我呀？小周也超想妈咪的！", "miss"); hearts("♥"); return; }
-    var L=talkDeck().filter(function(m){ return talkLast.indexOf(m.t)<0; });
+    if (tapCount===6){ say("哎呀，妈咪一直点我，是不是很想我呀？心心也超想妈咪的！", "miss"); hearts("♥"); return; }
+    var deck=talkDeck(), dk=dayKey(Date.now());
+    if (lsGet("xz-talk-day")!==dk){
+      // 今天第一次点：先说今天专属的那一句（同一个星期几，每周轮着换）
+      lsSet("xz-talk-day", dk);
+      var special=deck.filter(function(m){ return m.day; });
+      var week=Math.floor(dayNum(Date.now())/7);
+      var first=special.filter(function(m){ return m.w===5; })[0] || special[week % special.length];
+      if (first){ talkLast.push(first.t); tipIdx++; say(first.t, first.p); if (first.fx) hearts(first.fx); return; }
+    }
+    var L=deck.filter(function(m){ return talkLast.indexOf(m.t)<0; });
     // 小贴士和悄悄话轮流来：每三次里有一次小贴士
     var wantTip = tipIdx%3===2, pool=L.filter(function(m){ return !!m.tip===wantTip; });
     if (!pool.length) pool=L;
