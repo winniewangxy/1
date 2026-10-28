@@ -180,6 +180,17 @@ button{cursor:pointer}
 .seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 2px 8px rgba(0,0,0,.08)}
 .chart-card{background:var(--surface);border-radius:24px;padding:14px 10px 10px;box-shadow:var(--shadow)}
 .chart-card svg{display:block;width:100%;height:auto}
+.seg button{font-size:15px;padding:10px 0}
+.chart-nav{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 4px 6px}
+.nav-btn{border:0;background:var(--sunk);color:var(--ink);width:40px;height:40px;border-radius:12px;font-size:24px;line-height:1;flex:none}
+.nav-btn:disabled{opacity:.3}
+.chart-span{flex:1;min-width:0;text-align:center;display:flex;flex-direction:column}
+.chart-span b{font-size:16px;font-variant-numeric:tabular-nums}
+.chart-span span{font-size:13px;color:var(--muted)}
+.chart-vp{overflow:hidden;touch-action:pan-y}
+#chart{will-change:transform}
+#chart.anim{transition:transform .2s ease}
+.chart-hint{margin:6px 0 0;text-align:center;font-size:13px;color:var(--muted)}
 .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:15px;color:var(--muted);padding:6px 8px 0}
 .legend i{display:inline-block;width:14px;height:4px;border-radius:2px;vertical-align:middle;margin-right:6px}
 .ax{fill:var(--muted);font-size:11px;font-family:var(--f-num)}
@@ -377,17 +388,25 @@ textarea:focus{outline:none;border-color:var(--heart)}
   <section id="view-trend" class="today-list" hidden>
     <h2 class="section-title">血压趋势</h2>
     <div class="seg" role="group" aria-label="时间范围">
-      <button data-range="7" aria-pressed="true">7天</button>
-      <button data-range="30" aria-pressed="false">30天</button>
-      <button data-range="90" aria-pressed="false">3个月</button>
+      <button data-range="3d" aria-pressed="false">3天</button>
+      <button data-range="7d" aria-pressed="true">7天</button>
+      <button data-range="1m" aria-pressed="false">1个月</button>
+      <button data-range="3m" aria-pressed="false">3个月</button>
+      <button data-range="1y" aria-pressed="false">1年</button>
     </div>
     <div class="chart-card">
-      <div id="chart"></div>
+      <div class="chart-nav">
+        <button type="button" class="nav-btn" id="chart-prev" aria-label="看更早的">‹</button>
+        <div class="chart-span"><b id="chart-span"></b><span id="chart-sub"></span></div>
+        <button type="button" class="nav-btn" id="chart-next" aria-label="看更近的">›</button>
+      </div>
+      <div class="chart-vp" id="chart-vp"><div id="chart"></div></div>
       <div class="legend">
         <span><i style="background:var(--heart)"></i>高压</span>
         <span><i style="background:var(--dia)"></i>低压</span>
         <span><i style="background:var(--muted);height:2px"></i>虚线：家庭自测偏高线 135/85</span>
       </div>
+      <p class="chart-hint">左右滑动图表，看更早或更近的记录</p>
     </div>
     <div class="stats" id="stats"></div>
     <div class="share">
@@ -427,7 +446,7 @@ textarea:focus{outline:none;border-color:var(--heart)}
     </div>
     <div class="field sys"><label for="in-sys">高压<small>收缩压</small></label><input id="in-sys" inputmode="numeric" pattern="[0-9]*" maxlength="3" placeholder="120" autocomplete="off"><span class="u">mmHg</span></div>
     <div class="field dia"><label for="in-dia">低压<small>舒张压</small></label><input id="in-dia" inputmode="numeric" pattern="[0-9]*" maxlength="3" placeholder="80" autocomplete="off"><span class="u">mmHg</span></div>
-    <div class="field"><label for="in-pulse">心率<small>可以不填</small></label><input id="in-pulse" inputmode="numeric" pattern="[0-9]*" maxlength="3" placeholder="70" autocomplete="off"><span class="u">次/分</span></div>
+    <div class="field pulse"><label for="in-pulse">心率<small>可以不填</small></label><input id="in-pulse" inputmode="numeric" pattern="[0-9]*" maxlength="3" placeholder="70" autocomplete="off"><span class="u">次/分</span></div>
 
     <p class="sub-label">今天的降压药</p>
     <div class="chips" id="med-chips">
@@ -1092,6 +1111,27 @@ var BPOCR = (function(){
     return {m:m,w:iw,h:ih};
   }
 
+  // 数码管的字是斜的：先把整块屏幕“扶正”，挨得很近的两个字（脉搏那行）才切得开
+  function deslant(M){
+    var m=M.m, w=M.w, h=M.h, best=0, bestScore=-1;
+    function shiftOf(k,y){ return Math.round(k*(y-h/2)); }
+    for (var k=0; k<=0.30001; k+=0.03){
+      var pad=Math.ceil(k*h/2)+1, W2=w+2*pad, col=new Uint8Array(W2*3), score=0;
+      // 分三段（大概是三行）各算有多少空白列
+      for (var y=0;y<h;y++){ var band=Math.min(2, Math.floor(3*y/h)), off=pad+shiftOf(k,y);
+        for (var x=0;x<w;x++) if (m[y*w+x]) col[band*W2+x+off]=1; }
+      for (var b=0;b<3;b++){ var first=-1,last=-1;
+        for (var x2=0;x2<W2;x2++) if (col[b*W2+x2]){ if (first<0) first=x2; last=x2; }
+        if (first<0) continue;
+        for (x2=first;x2<=last;x2++) if (!col[b*W2+x2]) score++; }
+      if (score>bestScore+1){ bestScore=score; best=k; }
+    }
+    if (!best) { M.slant=0.06; return M; }
+    var pad2=Math.ceil(best*h/2)+1, W3=w+2*pad2, m2=new Uint8Array(W3*h);
+    for (var yy=0;yy<h;yy++){ var o=pad2+shiftOf(best,yy); for (var xx=0;xx<w;xx++) if (m[yy*w+xx]) m2[yy*W3+xx+o]=1; }
+    return {m:m2, w:W3, h:h, slant:Math.max(0, 0.06-best), k:best};
+  }
+
   function bands(profile, minVal){
     var out=[], s=-1;
     for (var i=0;i<=profile.length;i++){
@@ -1120,25 +1160,42 @@ var BPOCR = (function(){
         var l=mc[mc.length-1];
         if (l && c[0]-l[1]-1 < rh*0.06) l[1]=c[1]; else mc.push(c.slice());
       });
-      var digits=mc.map(function(c){
+      function box(c){
         var ty=y1, by=y0;
         for (var y=y0;y<=y1;y++) for (var x=c[0];x<=c[1];x++) if (m[y*w+x]){ if (y<ty)ty=y; if (y>by)by=y; }
         return {x0:c[0],x1:c[1],y0:ty,y1:by};
-      }).filter(function(d){ return d.y1-d.y0+1 >= rh*0.6; });
-      return {y0:y0,y1:y1,h:rh,digits:digits};
+      }
+      var digits=mc.map(box).filter(function(d){ return d.y1-d.y0+1 >= rh*0.6; });
+      // 两个字粘在一起（一个框比一个字宽很多）：从中间最细的地方切开
+      var out=[];
+      digits.forEach(function(d){
+        var dh=d.y1-d.y0+1, dw=d.x1-d.x0+1;
+        if (dw > dh*0.95){
+          var lo=d.x0+Math.round(dw*0.3), hi=d.x1-Math.round(dw*0.3), bi=-1, bv=1e9;
+          for (var x=lo;x<=hi;x++){ var s=0; for (var y=d.y0;y<=d.y1;y++) s+=m[y*w+x]; if (s<bv){ bv=s; bi=x; } }
+          if (bi>0){ out.push(box([d.x0,bi-1])); out.push(box([bi+1,d.x1])); return; }
+        }
+        out.push(d);
+      });
+      // 以这一行最高的字为准，太矮的（心形、小图标）不算
+      var maxH=0; out.forEach(function(d){ maxH=Math.max(maxH, d.y1-d.y0+1); });
+      out=out.filter(function(d){ return d.y1-d.y0+1 >= maxH*0.75; });
+      return {y0:y0,y1:y1,h:rh,digits:out};
     });
   }
 
   // 4. 七段判读
   // 读一位数字：和 0~9 每个数字的“笔画样子”比，挑最像的；同时记下有多大把握
-  var DIGIT_CONF=[];
+  var DIGIT_CONF=[], DIGIT_VEC=[];
+  // 越用越准：记住妈咪那台血压计每个数字 7 根笔画各亮几分（保存时确认过的），识别时参考
+  var LIB={};          // {"7":[[a,b,c,d,e,f,g],…], …}
   function readDigit(M, d, rowH){
     var w=d.x1-d.x0+1, h=d.y1-d.y0+1;
-    if (w < h*0.36){ DIGIT_CONF.push(1); return "1"; }
+    if (w < h*0.36){ DIGIT_CONF.push(1); DIGIT_VEC.push(null); return "1"; }
     // 每根笔画只看它中间那段，避开笔画交界（以前中间那一横会碰到右边的竖，7 容易读成 9）
     var R={a:[.30,.70,0,.16], b:[.70,1,.14,.42], c:[.70,1,.58,.86], d:[.30,.70,.84,1],
            e:[0,.30,.58,.86], f:[0,.30,.14,.42], g:[.30,.70,.42,.58]};
-    var slant=0.06*h;                       // 斜体修正：上半部往右偏
+    var slant=(M.slant!=null ? M.slant : 0.06)*h;   // 斜体修正：上半部往右偏（已经扶正的就不用再修）
     var fills={}, mx=0;
     "abcdefg".split("").forEach(function(k){
       var r=R[k], on=0, tot=0;
@@ -1152,14 +1209,27 @@ var BPOCR = (function(){
       }
       fills[k]=tot?on/tot:0; if (fills[k]>mx) mx=fills[k];
     });
-    if (mx<0.12){ DIGIT_CONF.push(0); return "?"; }
+    if (mx<0.12){ DIGIT_CONF.push(0); DIGIT_VEC.push(null); return "?"; }
     var n="abcdefg".split("").map(function(k){ var v=fills[k]/mx; return v>1?1:v; });
-    var best=null, bc=1e9, second=1e9;
+    DIGIT_VEC.push(n.map(function(v){ return Math.round(v*100)/100; }));
+    // 每个数字的“代价”：和标准笔画样子差多少；学过这个数字的话，再和学过的样子比，按学的多少加权
+    var costs={};
     PATTERNS.forEach(function(p){
       var c=0; for (var i=0;i<7;i++){ var on=p[1][i]==="1"; c+= on ? (1-n[i])*(1-n[i]) : n[i]*n[i]; }
-      if (c<bc){ if (best!==p[0]) second=bc; bc=c; best=p[0]; }
-      else if (c<second && p[0]!==best) second=c;
+      if (costs[p[0]]==null || c<costs[p[0]]) costs[p[0]]=c;
     });
+    // 只有“最像的两个数字”都学过（各至少 3 次），才用学到的经验在它俩之间判断；不然学得不全，容易偏心
+    var order=Object.keys(costs).sort(function(x,y){ return costs[x]-costs[y]; });
+    var top2=order.slice(0,2);
+    if (top2.every(function(k){ return LIB[k] && LIB[k].length>=3; })){
+      var a=Math.min(0.6, Math.min(LIB[top2[0]].length, LIB[top2[1]].length)/8);
+      top2.forEach(function(k){
+        var pc=1e9; LIB[k].forEach(function(v){ var c=0; for (var i=0;i<7;i++){ var t=n[i]-v[i]; c+=t*t; } if (c<pc) pc=c; });
+        costs[k]=(1-a)*costs[k]+a*pc;
+      });
+    }
+    var best=null, bc=1e9, second=1e9;
+    Object.keys(costs).forEach(function(k){ var c=costs[k]; if (c<bc){ second=bc; bc=c; best=k; } else if (c<second) second=c; });
     if (bc>1.6){ DIGIT_CONF.push(0); return "?"; }
     DIGIT_CONF.push(Math.max(0, Math.min(1, second-bc)));
     return best;
@@ -1172,20 +1242,21 @@ var BPOCR = (function(){
     var G=toGray(img, 900, deg);
     var box=findLCD(G);
     if (!box) return {ok:false, reason:"没找到血压计屏幕"};
-    var M=segMask(G, box);
+    var M=deslant(segMask(G, box));
     var rows=splitDigits(M);
     if (!rows[0].digits.length || !rows[1].digits.length) return {ok:false, reason:"屏幕上的数字没看清"};
-    var confs=[];
+    var confs=[], vecs=[];
     var nums=rows.map(function(r){
-      DIGIT_CONF=[];
+      DIGIT_CONF=[]; DIGIT_VEC=[];
       var t=r.digits.map(function(d){ return readDigit(M,d,r.h); }).join("");
       confs.push(DIGIT_CONF.length ? Math.min.apply(null, DIGIT_CONF) : 0);
+      vecs.push(DIGIT_VEC.slice());
       return t;
     });
     var sys=/^\d{2,3}$/.test(nums[0])?+nums[0]:null;
     var dia=/^\d{2,3}$/.test(nums[1]||"")?+nums[1]:null;
     var pulse=/^\d{2,3}$/.test(nums[2]||"")?+nums[2]:null;
-    var r={sys:sys, dia:dia, pulse:pulse, raw:nums, box:box, deg:deg, M:M, rows:rows, conf:confs};
+    var r={sys:sys, dia:dia, pulse:pulse, raw:nums, box:box, deg:deg, M:M, rows:rows, conf:confs, vecs:vecs};
     r.ok=!!(sys&&dia) && plausible(r);
     return r;
   }
@@ -1317,10 +1388,10 @@ var BPOCR = (function(){
     }).sort(function(a,b){ return a.y-b.y; }).slice(0,3);
     if (big.length<2) return {ok:false};
     var M={m:m, w:W, h:H};
-    var gconf=[];
-    var nums=big.map(function(rw){ DIGIT_CONF=[]; var t=rw.d.map(function(d){ return readDigit(M,d,rw.h); }).join(""); gconf.push(DIGIT_CONF.length?Math.min.apply(null,DIGIT_CONF):0); return t; });
+    var gconf=[], gvecs=[];
+    var nums=big.map(function(rw){ DIGIT_CONF=[]; DIGIT_VEC=[]; var t=rw.d.map(function(d){ return readDigit(M,d,rw.h); }).join(""); gconf.push(DIGIT_CONF.length?Math.min.apply(null,DIGIT_CONF):0); gvecs.push(DIGIT_VEC.slice()); return t; });
     var sys=/^\d{2,3}$/.test(nums[0])?+nums[0]:null, dia=/^\d{2,3}$/.test(nums[1])?+nums[1]:null, pulse=/^\d{2,3}$/.test(nums[2]||"")?+nums[2]:null;
-    var res={sys:sys, dia:dia, pulse:pulse, raw:nums, deg:deg, inv:inv, conf:gconf};
+    var res={sys:sys, dia:dia, pulse:pulse, raw:nums, deg:deg, inv:inv, conf:gconf, vecs:gvecs};
     res.ok=!!(sys&&dia) && plausible(res);
     return res;
   }
@@ -1353,6 +1424,12 @@ var BPOCR = (function(){
     var best=pool[0];
     var out={}; for (var k in best) out[k]=best[k];
     out.pulse = pk!=null ? +pk : null;
+    // 心率单独看把握：各角度读出的心率不一致，或者把握都不大，就只把心率框标黄
+    if (pk!=null){
+      var tot=0; Object.keys(pv).forEach(function(k2){ tot+=pv[k2]; });
+      var pcs=pool.filter(function(r){ return r.pulse===+pk; }).map(function(r){ return r.conf&&r.conf[2]||0; });
+      out.pulseUnsure = pv[pk]/tot<0.7 || Math.max.apply(null,pcs)<0.4;
+    }
     var share=pool.length/cands.length;
     // 各角度意见不一，或者把握不大：标成“请核对”
     out.unsure = share<0.6 || conf2(best)<0.25;
@@ -1360,7 +1437,7 @@ var BPOCR = (function(){
   }
   function finish(r){
     var M=r.M, rows=r.rows;
-    var res={ok:!!r.ok, sys:r.ok?r.sys:null, dia:r.ok?r.dia:null, pulse:r.ok?r.pulse:null, raw:r.raw, deg:r.deg, reason:r.reason, conf:r.conf||null, unsure:!!r.unsure};
+    var res={ok:!!r.ok, sys:r.ok?r.sys:null, dia:r.ok?r.dia:null, pulse:r.ok?r.pulse:null, raw:r.raw, deg:r.deg, reason:r.reason, conf:r.conf||null, unsure:!!r.unsure, pulseUnsure:!!r.pulseUnsure, vecs:r.vecs||null};
     if (read.debug && M){
       var cv=document.createElement("canvas"); cv.width=M.w; cv.height=M.h; var cx=cv.getContext("2d");
       var id=cx.createImageData(M.w,M.h); for (var i=0;i<M.m.length;i++){ var v=M.m[i]?0:255; id.data[i*4]=v;id.data[i*4+1]=v;id.data[i*4+2]=v;id.data[i*4+3]=255; }
@@ -1370,7 +1447,24 @@ var BPOCR = (function(){
     }
     return res;
   }
-  return {read:read, _gen:readGeneric};
+  // 保存时调用：把确认过的数字（妈咪改过的就按改后的）记下来
+  function learn(vecs, finals){
+    if (!vecs) return 0; var n=0;
+    finals.forEach(function(v, row){
+      if (v==null || !vecs[row]) return;
+      var str=String(v), vs=vecs[row];
+      if (str.length!==vs.length) return;               // 位数对不上就不学
+      for (var i=0;i<str.length;i++){
+        if (!vs[i]) continue;                            // “1” 不用学
+        var k=str.charAt(i), arr=LIB[k]||(LIB[k]=[]);
+        arr.push(vs[i]); if (arr.length>15) arr.shift(); n++;
+      }
+    });
+    return n;
+  }
+  function setLibrary(lib){ LIB = lib && typeof lib==="object" ? lib : {}; }
+  function getLibrary(){ return LIB; }
+  return {read:read, _gen:readGeneric, learn:learn, setLibrary:setLibrary, getLibrary:getLibrary};
 })();
 </script>
 <script>
@@ -1382,7 +1476,7 @@ var BPOCR = (function(){
   var readings = [];        // {id,t,sys,dia,pulse,med,feel:[],note}
   var mode = "loading";     // loading | db | local
   var db = null, dl = null, col = null;
-  var range = 7, openRow = null, confirmDel = null;
+  var range = "7d", offset = 0, openRow = null, confirmDel = null;
   var $ = function(id){ return document.getElementById(id); };
 
   /* ---------- 分类（家庭自测标准） ---------- */
@@ -1602,46 +1696,93 @@ var BPOCR = (function(){
     el.innerHTML = html+"</div>";
   }
 
+  var RANGES={
+    "3d":{days:3,  name:"3天"},
+    "7d":{days:7,  name:"7天"},
+    "1m":{days:30, name:"1个月"},
+    "3m":{days:91, name:"3个月", agg:"day"},
+    "1y":{days:364,name:"1年",  agg:"week"}
+  };
+  function win(off){
+    var R=RANGES[range], e=new Date(); e.setHours(0,0,0,0);
+    e.setDate(e.getDate()+1-(off==null?offset:off)*R.days);
+    var st=new Date(e); st.setDate(st.getDate()-R.days);
+    return {s:st.getTime(), e:e.getTime()};
+  }
   function inRange(){
-    var from = Date.now() - range*864e5;
-    return readings.filter(function(r){ return r.t>=from; }).sort(function(a,b){ return a.t-b.t; });
+    var w=win();
+    return readings.filter(function(r){ return r.t>=w.s && r.t<w.e; }).sort(function(a,b){ return a.t-b.t; });
+  }
+  function canOlder(){ var w=win(); return readings.some(function(r){ return r.t<w.s; }); }
+  function md(t){ var d=new Date(t); return (d.getMonth()+1)+"月"+d.getDate()+"日"; }
+  // 3个月按天平均、1年按周平均，点太多会挤成一团
+  function chartPoints(data, w){
+    var R=RANGES[range];
+    if (!R.agg) return data.map(function(r){ return {t:r.t, sys:r.sys, dia:r.dia, n:1}; });
+    var buckets={}, size=R.agg==="day" ? 1 : 7;
+    data.forEach(function(r){
+      var day=Math.floor((r.t-w.s)/864e5), k=Math.floor(day/size);
+      var b=buckets[k]||(buckets[k]={sys:0,dia:0,n:0,k:k}); b.sys+=r.sys; b.dia+=r.dia; b.n++;
+    });
+    return Object.keys(buckets).map(function(k){ var b=buckets[k];
+      return {t:w.s+(b.k*size+size/2)*864e5, sys:Math.round(b.sys/b.n), dia:Math.round(b.dia/b.n), n:b.n}; })
+      .sort(function(a,b){ return a.t-b.t; });
   }
 
   function renderChart(){
-    var data=inRange(), el=$("chart");
-    var W=360,H=230,L=34,R=10,T=12,B=28, ymin=50, ymax=200;
-    var maxV = Math.max.apply(null,[180].concat(data.map(function(r){return r.sys;})));
-    var minV = Math.min.apply(null,[60].concat(data.map(function(r){return r.dia;})));
-    ymax = Math.ceil((maxV+10)/10)*10; ymin = Math.floor((minV-10)/10)*10;
-    var now=Date.now(), x0=now-range*864e5;
-    function X(t){ return L+(t-x0)/(now-x0)*(W-L-R); }
+    var w=win(), data=inRange(), el=$("chart"), R=RANGES[range];
+    var pts=chartPoints(data, w);
+    // 顶上的时间段
+    var endDay=w.e-864e5, y1=new Date(w.s).getFullYear(), y2=new Date(endDay).getFullYear();
+    function ym(t){ var d=new Date(t); return d.getFullYear()+"年"+(d.getMonth()+1)+"月"; }
+    $("chart-span").textContent = range==="1y" ? ym(w.s)+" – "+ym(endDay)
+      : (y1!==y2 ? y1+"年" : "")+md(w.s)+" – "+(y1!==y2 ? y2+"年" : "")+md(endDay);
+    $("chart-sub").textContent = (offset===0 ? "最近"+R.name : "")+(R.agg==="day" ? (offset===0?" · ":"")+"每天的平均值" : R.agg==="week" ? (offset===0?" · ":"")+"每周的平均值" : "");
+    $("chart-prev").disabled=!canOlder();
+    $("chart-next").disabled=offset===0;
+
+    var W=360,H=230,L=34,Rr=10,T=12,B=28;
+    var maxV = Math.max.apply(null,[160].concat(pts.map(function(r){return r.sys;})));
+    var minV = Math.min.apply(null,[70].concat(pts.map(function(r){return r.dia;})));
+    var ymax = Math.ceil((maxV+10)/10)*10, ymin = Math.floor((minV-10)/10)*10;
+    function X(t){ return L+(t-w.s)/(w.e-w.s)*(W-L-Rr); }
     function Y(v){ return T+(ymax-v)/(ymax-ymin)*(H-T-B); }
     var g='';
-    [60,90,120,150,180].forEach(function(v){ if(v>ymin&&v<ymax){ g+='<line class="grid" x1="'+L+'" x2="'+(W-R)+'" y1="'+Y(v)+'" y2="'+Y(v)+'"/><text class="ax" x="'+(L-6)+'" y="'+(Y(v)+4)+'" text-anchor="end">'+v+'</text>'; } });
-    g+='<line class="ref" stroke="var(--heart)" x1="'+L+'" x2="'+(W-R)+'" y1="'+Y(135)+'" y2="'+Y(135)+'"/><text class="ax" x="'+(W-R)+'" y="'+(Y(135)-4)+'" text-anchor="end" style="fill:var(--heart)">135</text>';
-    g+='<line class="ref" stroke="var(--dia)" x1="'+L+'" x2="'+(W-R)+'" y1="'+Y(85)+'" y2="'+Y(85)+'"/><text class="ax" x="'+(W-R)+'" y="'+(Y(85)-4)+'" text-anchor="end" style="fill:var(--dia)">85</text>';
-    // x ticks
-    var ticks = range===7 ? 7 : range===30 ? 6 : 6;
-    for (var i=0;i<=ticks;i++){
-      var tt = x0 + (now-x0)*i/ticks, d=new Date(tt);
-      if (i===ticks) continue;
-      g+='<text class="ax" x="'+X(tt)+'" y="'+(H-8)+'" text-anchor="'+(i===0?"start":"middle")+'">'+(d.getMonth()+1)+'/'+d.getDate()+'</text>';
+    [60,90,120,150,180,210].forEach(function(v){ if(v>ymin&&v<ymax){ g+='<line class="grid" x1="'+L+'" x2="'+(W-Rr)+'" y1="'+Y(v)+'" y2="'+Y(v)+'"/><text class="ax" x="'+(L-6)+'" y="'+(Y(v)+4)+'" text-anchor="end">'+v+'</text>'; } });
+    // 横轴刻度
+    var ticks=[], d=new Date(w.s);
+    while (d.getTime()<w.e){
+      var t=d.getTime(), day=d.getDate(), lab=null, mid=false;
+      if (range==="3d"||range==="7d"){ lab=(d.getMonth()+1)+"/"+day; mid=true; }
+      else if (range==="1m"){ if (Math.round((t-w.s)/864e5)%5===0) lab=(d.getMonth()+1)+"/"+day; }
+      else if (range==="3m"){ if (day===1||day===15) lab=(d.getMonth()+1)+"/"+day; }
+      else { if (day===1) lab=(d.getMonth()===0 ? String(d.getFullYear()).slice(2)+"年" : (d.getMonth()+1)+"月"); }
+      if (lab!==null) ticks.push({t:t, lab:lab, mid:mid});
+      d.setDate(d.getDate()+1);
     }
-    if (!data.length){
-      g+='<text x="'+((W+L)/2)+'" y="'+(H/2)+'" text-anchor="middle" style="fill:var(--muted);font-size:14px">这段时间还没有记录</text>';
+    ticks.forEach(function(k){
+      var x=X(k.t), lx=k.mid ? X(k.t+432e5) : x;
+      g+='<line class="grid" x1="'+x.toFixed(1)+'" x2="'+x.toFixed(1)+'" y1="'+T+'" y2="'+(H-B)+'" opacity=".5"/>';
+      if (lx>L+6 || k.mid) g+='<text class="ax" x="'+lx.toFixed(1)+'" y="'+(H-8)+'" text-anchor="middle"'+(range==="1y"?' style="font-size:10px"':'')+'>'+k.lab+'</text>';
+    });
+    g+='<line class="ref" stroke="var(--heart)" x1="'+L+'" x2="'+(W-Rr)+'" y1="'+Y(135)+'" y2="'+Y(135)+'"/><text class="ax" x="'+(W-Rr)+'" y="'+(Y(135)-4)+'" text-anchor="end" style="fill:var(--heart)">135</text>';
+    g+='<line class="ref" stroke="var(--dia)" x1="'+L+'" x2="'+(W-Rr)+'" y1="'+Y(85)+'" y2="'+Y(85)+'"/><text class="ax" x="'+(W-Rr)+'" y="'+(Y(85)-4)+'" text-anchor="end" style="fill:var(--dia)">85</text>';
+    if (!pts.length){
+      g+='<text x="'+((W+L)/2)+'" y="'+(H/2)+'" text-anchor="middle" style="fill:var(--muted);font-size:14px">这段时间没有记录</text>';
     } else {
+      var rad = pts.length>60 ? 2 : pts.length>25 ? 2.6 : 3.2;
       function line(key,color){
-        var pts=data.map(function(r){ return X(r.t).toFixed(1)+","+Y(r[key]).toFixed(1); });
-        var out = data.length>1 ? '<polyline points="'+pts.join(" ")+'" fill="none" stroke="'+color+'" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>' : '';
-        data.forEach(function(r,idx){
-          var last = idx===data.length-1;
-          out+='<circle cx="'+X(r.t).toFixed(1)+'" cy="'+Y(r[key]).toFixed(1)+'" r="'+(last?5:3.2)+'" fill="'+(last?color:"var(--surface)")+'" stroke="'+color+'" stroke-width="2"/>';
+        var p=pts.map(function(r){ return X(r.t).toFixed(1)+","+Y(r[key]).toFixed(1); });
+        var out = pts.length>1 ? '<polyline points="'+p.join(" ")+'" fill="none" stroke="'+color+'" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>' : '';
+        pts.forEach(function(r,idx){
+          var last = idx===pts.length-1 && offset===0;
+          out+='<circle cx="'+X(r.t).toFixed(1)+'" cy="'+Y(r[key]).toFixed(1)+'" r="'+(last?5:rad)+'" fill="'+(last?color:"var(--surface)")+'" stroke="'+color+'" stroke-width="'+(rad<2.5?1.5:2)+'"/>';
         });
         return out;
       }
       g+=line("sys","var(--heart)")+line("dia","var(--dia)");
     }
-    el.innerHTML='<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="近'+range+'天血压折线图">'+g+'</svg>';
+    el.innerHTML='<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+$("chart-span").textContent+' 的血压折线图">'+g+'</svg>';
 
     var st=$("stats");
     if (!data.length){ st.innerHTML=''; return; }
@@ -1653,6 +1794,48 @@ var BPOCR = (function(){
       '<div class="stat"><span class="k">记录次数</span><span class="n num">'+data.length+'</span></div>'+
       '<div class="stat"><span class="k">偏高次数</span><span class="n num" style="color:'+(hi?"var(--high)":"var(--ok)")+'">'+hi+'</span></div>';
   }
+
+  // 翻时间段：dir=+1 看更早，-1 看更近；带滑动动画
+  var chartBusy=false;
+  function shiftChart(dir){
+    if (chartBusy) return;
+    if (dir>0 && !canOlder()) return;
+    if (dir<0 && offset===0) return;
+    var el=$("chart"); chartBusy=true;
+    el.classList.add("anim"); el.style.transform="translateX("+(dir>0?100:-100)+"%)";
+    setTimeout(function(){
+      offset+=dir; renderChart();
+      el.classList.remove("anim"); el.style.transform="translateX("+(dir>0?-100:100)+"%)";
+      void el.offsetWidth;
+      el.classList.add("anim"); el.style.transform="translateX(0)";
+      setTimeout(function(){ el.classList.remove("anim"); chartBusy=false; }, 220);
+    }, 200);
+  }
+  $("chart-prev").addEventListener("click", function(){ shiftChart(1); });
+  $("chart-next").addEventListener("click", function(){ shiftChart(-1); });
+  (function(){
+    var vp=$("chart-vp"), sx=0, sy=0, dx=0, mode=null, pid=null;
+    vp.addEventListener("pointerdown", function(e){ if (chartBusy) return; sx=e.clientX; sy=e.clientY; dx=0; mode=null; pid=e.pointerId; });
+    vp.addEventListener("pointermove", function(e){
+      if (pid!==e.pointerId) return;
+      var mx=e.clientX-sx, my=e.clientY-sy;
+      if (mode===null && (Math.abs(mx)>8 || Math.abs(my)>8)){ mode = Math.abs(mx)>Math.abs(my) ? "h" : "v"; if (mode==="h"){ try{ vp.setPointerCapture(e.pointerId); }catch(_){} } }
+      if (mode!=="h") return;
+      dx=mx;
+      var blocked=(dx>0 && !canOlder()) || (dx<0 && offset===0);
+      $("chart").style.transform="translateX("+(blocked ? dx*0.25 : dx)+"px)";
+    });
+    function end(e){
+      if (pid!==e.pointerId) return; pid=null;
+      if (mode!=="h"){ mode=null; return; }
+      mode=null;
+      var el=$("chart");
+      if (dx>60 && canOlder()) shiftChart(1);
+      else if (dx<-60 && offset>0) shiftChart(-1);
+      else { el.classList.add("anim"); el.style.transform="translateX(0)"; setTimeout(function(){ el.classList.remove("anim"); }, 220); }
+    }
+    vp.addEventListener("pointerup", end); vp.addEventListener("pointercancel", end);
+  })();
 
   function renderNote(){
     var n=$("storage-note");
@@ -1701,8 +1884,10 @@ var BPOCR = (function(){
 
   /* ---------- 表单 ---------- */
   var med=null, meal=null;
+  var lastScan=null;     // 这次拍照认出来的数字（保存时用来“学习”）
   function openForm(opts){
     opts = opts || {};
+    if (!opts.scan) lastScan=null;
     $("form").reset(); med=null; $("err").textContent="";
     document.querySelectorAll("#med-chips .chip,#feel-chips .chip,#food-chips .chip,#meal-chips .chip").forEach(function(c){ c.setAttribute("aria-pressed","false"); });
     meal=null;
@@ -1794,6 +1979,19 @@ var BPOCR = (function(){
     scanPhoto(file, null);
   });
   // file：照片文件（Blob）；ready：已经画好的图（App 自带相机拍的 canvas），有就直接用
+  // 和妈咪最近一个月的数比：差得特别多就提醒核对（读错一位常常会差很多）
+  function farFromUsual(r){
+    var since=Date.now()-30*864e5, rs=readings.filter(function(x){ return x.t>=since; });
+    if (rs.length<5) return false;
+    function far(key, v, minGap){
+      var xs=rs.map(function(x){ return x[key]; }).filter(function(x){ return typeof x==="number"; });
+      if (xs.length<5 || v==null) return false;
+      var m=xs.reduce(function(a,b){ return a+b; },0)/xs.length;
+      var sd=Math.sqrt(xs.reduce(function(a,b){ return a+(b-m)*(b-m); },0)/xs.length);
+      return Math.abs(v-m) > Math.max(minGap, 3*sd);
+    }
+    return far("sys", r.sys, 25) || far("dia", r.dia, 15) || far("pulse", r.pulse, 20);
+  }
   function scanPhoto(file, ready){
     openForm({scan:true});
     scanURL = URL.createObjectURL(file); $("scan-img").src = scanURL;
@@ -1806,8 +2004,12 @@ var BPOCR = (function(){
       if (scanCtl!==ctl) return;
       if (r.ok){
         scanCtl=null; fillFrom(r.sys,r.dia,r.pulse);
-        document.querySelectorAll(".field").forEach(function(f){ f.classList.toggle("check", !!r.unsure); });
-        if (r.unsure) setScan("我读到的是 "+r.sys+"/"+r.dia+(r.pulse?"，心率 "+r.pulse:"")+"，但这次不太有把握。妈咪对着血压计仔细看看黄框里的数字，不对就直接改，没问题再点“保存”。", false, "think");
+        lastScan={vecs:r.vecs};
+        var odd=farFromUsual(r);
+        document.querySelectorAll(".field").forEach(function(f){ f.classList.toggle("check", !!(r.unsure||odd) || (f.classList.contains("pulse") && !!r.pulseUnsure)); });
+        if (odd && !r.unsure) setScan("我读到的是 "+r.sys+"/"+r.dia+(r.pulse?"，心率 "+r.pulse:"")+"，和妈咪平时的数差得有点多。妈咪再对着血压计看一眼黄框里的数字，没错的话就点“保存”。", false, "think");
+        else if (r.unsure) setScan("我读到的是 "+r.sys+"/"+r.dia+(r.pulse?"，心率 "+r.pulse:"")+"，但这次不太有把握。妈咪对着血压计仔细看看黄框里的数字，不对就直接改，没问题再点“保存”。", false, "think");
+        else if (r.pulseUnsure) setScan("我看到的是 "+r.sys+"/"+r.dia+"，心率好像是 "+r.pulse+"，但心率这次不太有把握。妈咪看一眼黄框里的心率，不对就直接改，没问题再点“保存”。", false, "think");
         else setScan("我看到的是 "+r.sys+"/"+r.dia+(r.pulse?"，心率 "+r.pulse:"")+"。和血压计上的对一下，没错就点下面的“保存”。"+(r.pulse?"":"心率没看清，可以自己填。"), false, "point");
       } else if (sampler){
         askClaude(file, ctl);
@@ -1988,6 +2190,7 @@ var BPOCR = (function(){
     var r={ id:"r"+Date.now().toString(36)+Math.random().toString(36).slice(2,6), t:t, sys:s, dia:d, pulse:p, med:med, feel:feel, food:food, meal:meal, note:$("in-note").value.trim().slice(0,200) };
     saving=true; err.textContent="";
     var before=streaks().current;
+    lastScan=null;
     addReading(r).then(function(){
       saving=false; closeForm(); showView("home");
       var k=classify(s,d);
@@ -2040,7 +2243,7 @@ var BPOCR = (function(){
   }
   document.querySelectorAll(".tabs button").forEach(function(b){ b.addEventListener("click", function(){ showView(b.dataset.view); }); });
   document.querySelectorAll(".seg button").forEach(function(b){ b.addEventListener("click", function(){
-    range=+b.dataset.range;
+    range=b.dataset.range; offset=0;
     document.querySelectorAll(".seg button").forEach(function(x){ x.setAttribute("aria-pressed", x===b?"true":"false"); });
     renderChart();
   }); });
@@ -2161,7 +2364,7 @@ var BPOCR = (function(){
   $("copy-text").addEventListener("click", function(){
     var data=inRange().slice().reverse();
     if (!data.length){ toast("这段时间还没有记录"); return; }
-    var txt="血压记录（近"+range+"天，共"+data.length+"次）\n";
+    var txt="血压记录（"+$("chart-span").textContent+"，共"+data.length+"次）\n";
     data.forEach(function(r){ var kk=classify(r.sys,r.dia); txt+=(kk==="high"||kk==="crit"||kk==="low" ? "❗" : "")+fullDate(r.t).slice(5)+" "+hm(r.t)+"  "+r.sys+"/"+r.dia+(kk==="high"||kk==="crit"||kk==="low" ? "（"+CAT[kk].label+"）" : "")+(r.pulse?"  心率"+r.pulse:"")+(r.med&&r.med!=="none"?"  "+medText(r.med):"")+((r.feel&&r.feel.length)?"  "+r.feel.join("、"):"")+((r.food&&r.food.length)?"  "+r.food.join("、"):"")+(r.meal?"  "+r.meal:"")+(r.note?"  "+r.note:"")+"\n"; });
     var fb=$("copy-fallback");
     function fallback(){ fb.hidden=false; fb.value=txt; fb.focus(); fb.select(); toast("长按上面的文字，选“全选”再复制"); }
@@ -2315,6 +2518,7 @@ var BPOCR = (function(){
   if (IN_WECHAT && !HAS_CLAUDE){ $("wx-tip").hidden=false; IS_APP_HOST=false; }
 
   applyCamMode();
+  try{ localStorage.removeItem("xz-digit-lib"); }catch(e){}   // “学习”先停用，清掉以前记下的
 
   // 安卓 App 的返回键：先关掉打开着的窗口，没有窗口再退出
   window.__xzBack=function(){
