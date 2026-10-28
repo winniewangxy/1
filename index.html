@@ -1574,7 +1574,7 @@ var BPOCR = (function(){
     var st = streaks(), run = st.current>=2 ? "已经连续记录 "+st.current+" 天啦，" : "";
     if (!today.length) return say(greeting()+(st.current>=2 ? "已经连续记录 "+st.current+" 天啦，今天也记一下，别断了哦～" : "今天还没测血压哦，测完记一下吧～"));
     if (am && !pm && h>=17) return say(greeting()+run+"早上测过啦，睡前记得再测一次哦。");
-    if (am && pm) return say(greeting()+run+"今天早晚都测了，小周超级棒！"+(new Date().getDay()===5?"今天是周五，明天就放假啦！":""),"cheer");
+    if (am && pm) return say(greeting()+run+"今天早晚都测了，妈咪超级棒！"+(new Date().getDay()===5?"今天是周五，明天就放假啦！":""),"cheer");
     say(greeting()+run+"今天已经记了 "+today.length+" 次，真认真！");
   }
   /* ---------- 点心心：说悄悄话、看日子说话、讲小贴士 ---------- */
@@ -1688,8 +1688,8 @@ var BPOCR = (function(){
   /* ---------- 连续记录 ---------- */
   var MILESTONES = [
     {n:3,  label:"3天",   title:"连续记录 3 天啦！", text:"妈咪太棒了，好习惯已经开始养成咯！"},
-    {n:7,  label:"7天",   title:"连续记录一整周！", text:"一天都没落下，小周超级棒！我们继续保持哦～"},
-    {n:14, label:"两周",  title:"连续记录两周！",   text:"坚持了 14 天，妈咪是最自律的小周！"},
+    {n:7,  label:"7天",   title:"连续记录一整周！", text:"一天都没落下，妈咪超级棒！我们继续保持哦～"},
+    {n:14, label:"两周",  title:"连续记录两周！",   text:"坚持了 14 天，妈咪真的太自律啦！"},
     {n:30, label:"一个月", title:"连续记录一个月！", text:"整整 30 天！心心为妈咪骄傲，比心～"}
   ];
   function dayNum(t){ var d=new Date(t); return Math.round(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())/864e5); }
@@ -2308,7 +2308,9 @@ var BPOCR = (function(){
         if (drink.length) extra+="刚"+drink.join("、").replace(/喝了/g,"喝")+"，血压会暂时高一点，下次最好过 30 分钟再测。";
         if (food.indexOf("吃了重油重盐")>=0) extra+="今天吃得咸，接下来清淡一点哦。";
       }
-      say(SAY_AFTER[k]+(extra?" "+extra:""), k==="ok"?"cheer":k==="elev"?"point":"hug");
+      var msg=SAY_AFTER[k];
+      if (Math.random()>=0.2) msg=msg.replace("小周超级棒","妈咪超级棒");   // “小周”是昵称，偶尔叫一次才特别
+      say(msg+(extra?" "+extra:""), k==="ok"?"cheer":k==="elev"?"point":"hug");
       var list=readings.some(function(x){ return x.id===r.id; }) ? readings : readings.concat([r]);
       var after=streaks(list).current, hit=null;
       MILESTONES.forEach(function(m){ if (before<m.n && after>=m.n) hit=m; });
